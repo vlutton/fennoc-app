@@ -34,3 +34,38 @@ export function formatRelativeDue(dateStr: string | null): string {
   if (deltaDays > 1) return `in ${deltaDays} days`;
   return `${Math.abs(deltaDays)} days ago`;
 }
+
+/** Human duration from seconds → "2h 10m" / "45m" / "0s". */
+export function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  if (total === 0) return "0s";
+
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${secs}s`;
+}
+
+/** Elapsed clock from ms → "HH:MM:SS" zero-padded. */
+export function formatClock(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+/** Today's YYYY-MM-DD in America/Chicago. */
+export function chicagoToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}

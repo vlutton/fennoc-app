@@ -4,7 +4,16 @@ import axios, {
   isAxiosError,
 } from "axios";
 
-import type { Briefing, GetTasksOpts, HttpMethod, Status, Task } from "./types";
+import type {
+  Briefing,
+  GetTasksOpts,
+  HttpMethod,
+  OpenTimer,
+  Status,
+  Task,
+  TimeBlock,
+  TimeStartOpts,
+} from "./types";
 import { getKey, useAuth } from "../store/useAuth";
 
 let client: AxiosInstance | null = null;
@@ -97,6 +106,26 @@ export async function completeTask(
 
 export async function dropTask(taskId: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>("POST", `/api/tasks/${taskId}/drop`);
+}
+
+export async function getTodayTimeBlocks(day?: string): Promise<TimeBlock[]> {
+  return request<TimeBlock[]>("GET", "/api/time/blocks", undefined, {
+    params: day ? { day } : undefined,
+  });
+}
+
+export async function getOpenTimer(): Promise<OpenTimer> {
+  return request<OpenTimer>("GET", "/api/time/open");
+}
+
+export async function startTime(
+  opts: TimeStartOpts,
+): Promise<{ ok: boolean; message: string }> {
+  return request<{ ok: boolean; message: string }>("POST", "/api/time/start", opts);
+}
+
+export async function stopTime(): Promise<{ ok: boolean; message: string }> {
+  return request<{ ok: boolean; message: string }>("POST", "/api/time/stop");
 }
 
 export async function briefingMorning(): Promise<Briefing> {

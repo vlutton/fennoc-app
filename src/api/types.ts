@@ -39,3 +39,29 @@ export interface GetTasksOpts {
   source?: string;
   limit?: number;
 }
+
+export interface TimeBlock {
+  block_id: string;
+  started_at: string;
+  ended_at: string;
+  duration_s: number;
+  source: string;
+  category: string;
+  label: string;
+  confidence: string;
+  idempotency_key: string;
+  metadata: string; // JSON STRING on the wire — NOT an object
+  created_at: string;
+}
+
+export interface OpenTimer {
+  active: boolean;
+  started_at?: string;
+  label?: string;
+  category?: string;
+}
+
+export interface TimeStartOpts {
+  category: string;
+  label?: string;
+}
