@@ -81,6 +81,24 @@ export async function getTasks(opts: GetTasksOpts = {}): Promise<Task[]> {
   return request<Task[]>("GET", "/api/tasks", undefined, { params: opts });
 }
 
+export async function getTodayTasks(): Promise<Task[]> {
+  return request<Task[]>("GET", "/api/tasks/today");
+}
+
+export async function getOverdueTasks(): Promise<Task[]> {
+  return request<Task[]>("GET", "/api/tasks/overdue");
+}
+
+export async function completeTask(
+  taskId: string,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("POST", `/api/tasks/${taskId}/complete`);
+}
+
+export async function dropTask(taskId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("POST", `/api/tasks/${taskId}/drop`);
+}
+
 export async function briefingMorning(): Promise<Briefing> {
   return request<Briefing>("GET", "/api/briefing/morning");
 }
