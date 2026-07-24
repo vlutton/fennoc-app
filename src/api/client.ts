@@ -6,9 +6,15 @@ import axios, {
 
 import type {
   Briefing,
+  CaptureOpts,
+  CaptureResult,
+  CheckinCoverage,
+  CheckinCurrent,
+  CheckinReply,
   GetTasksOpts,
   HttpMethod,
   OpenTimer,
+  PendingCheckin,
   Status,
   Task,
   TimeBlock,
@@ -134,4 +140,41 @@ export async function briefingMorning(): Promise<Briefing> {
 
 export async function briefingEvening(): Promise<Briefing> {
   return request<Briefing>("GET", "/api/briefing/evening");
+}
+
+export async function getCheckinCurrentActivity(): Promise<CheckinCurrent> {
+  return request<CheckinCurrent>("GET", "/api/time/current");
+}
+
+export async function getPendingCheckin(): Promise<PendingCheckin> {
+  return request<PendingCheckin>("GET", "/api/checkin/pending");
+}
+
+export async function replyCheckin(
+  text: string,
+  questionType: string,
+): Promise<CheckinReply> {
+  return request<CheckinReply>("POST", "/api/checkin/reply", {
+    text,
+    question_type: questionType,
+  });
+}
+
+export async function getCheckinCoverage(
+  day?: string,
+): Promise<CheckinCoverage> {
+  return request<CheckinCoverage>("GET", "/api/checkin/coverage", undefined, {
+    params: day ? { day } : undefined,
+  });
+}
+
+export async function capture(
+  text: string,
+  opts?: CaptureOpts,
+): Promise<CaptureResult> {
+  return request<CaptureResult>("POST", "/api/capture", {
+    text,
+    idempotency_key: opts?.idempotency_key,
+    source_ref: opts?.source_ref ?? "fennoc-app",
+  });
 }

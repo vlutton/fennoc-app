@@ -65,3 +65,39 @@ export interface TimeStartOpts {
   category: string;
   label?: string;
 }
+
+export interface PendingCheckin {
+  pending: boolean;
+  id?: number;
+  sent_at?: string;
+  question_type?: string;
+  question_text?: string;
+}
+
+export interface CheckinReply {
+  ok: boolean;
+  ack: string;
+}
+
+/** Check-in cursor from GET /api/time/current — distinct from OpenTimer (/api/time/open). */
+export interface CheckinCurrent {
+  active: boolean;
+  category?: string;
+  label?: string;
+  started_at?: string;
+}
+
+export interface CaptureResult {
+  ok: boolean;
+  event_id: string | null;
+}
+
+export interface CaptureOpts {
+  idempotency_key?: string;
+  source_ref?: string;
+}
+
+export interface CheckinCoverage {
+  answered: number;
+  total: number;
+}
