@@ -13,6 +13,7 @@ import {
   getTodayTasks,
 } from "../api/client";
 import type { GetTasksOpts, Task } from "../api/types";
+import { enqueueIfOffline, isNetworkError } from "../outbox";
 
 export const taskQueryKeys = {
   all: ["tasks", "all"] as const,
@@ -54,7 +55,17 @@ export function useOverdueTasks(): UseQueryResult<Task[], Error> {
 export function useCompleteTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => completeTask(taskId),
+    mutationFn: async (taskId: string) => {
+      try {
+        return await completeTask(taskId);
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline("complete", { taskId });
+          return { ok: true, queued: true as const };
+        }
+        throw error;
+      }
+    },
     onSuccess: () => invalidateTaskLists(queryClient),
   });
 }
@@ -62,7 +73,17 @@ export function useCompleteTask() {
 export function useDropTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => dropTask(taskId),
+    mutationFn: async (taskId: string) => {
+      try {
+        return await dropTask(taskId);
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline("drop", { taskId });
+          return { ok: true, queued: true as const };
+        }
+        throw error;
+      }
+    },
     onSuccess: () => invalidateTaskLists(queryClient),
   });
 }

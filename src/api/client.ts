@@ -134,12 +134,16 @@ export async function stopTime(): Promise<{ ok: boolean; message: string }> {
   return request<{ ok: boolean; message: string }>("POST", "/api/time/stop");
 }
 
-export async function briefingMorning(): Promise<Briefing> {
-  return request<Briefing>("GET", "/api/briefing/morning");
+export async function briefingMorning(day?: string): Promise<Briefing> {
+  return request<Briefing>("GET", "/api/briefing/morning", undefined, {
+    params: day ? { day } : undefined,
+  });
 }
 
-export async function briefingEvening(): Promise<Briefing> {
-  return request<Briefing>("GET", "/api/briefing/evening");
+export async function briefingEvening(day?: string): Promise<Briefing> {
+  return request<Briefing>("GET", "/api/briefing/evening", undefined, {
+    params: day ? { day } : undefined,
+  });
 }
 
 export async function getCheckinCurrentActivity(): Promise<CheckinCurrent> {

@@ -12,6 +12,7 @@ import {
   stopTime,
 } from "../api/client";
 import type { OpenTimer, TimeBlock, TimeStartOpts } from "../api/types";
+import { enqueueIfOffline, isNetworkError } from "../outbox";
 import { chicagoToday } from "../utils/format";
 
 export const timeQueryKeys = {
@@ -53,7 +54,20 @@ export function useTodayTimeBlocks(
 export function useStartTime() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (opts: TimeStartOpts) => startTime(opts),
+    mutationFn: async (opts: TimeStartOpts) => {
+      try {
+        return await startTime(opts);
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline("time_start", {
+            category: opts.category,
+            label: opts.label,
+          });
+          return { ok: true, message: "queued", queued: true as const };
+        }
+        throw error;
+      }
+    },
     onSuccess: () => invalidateTimeQueries(queryClient, chicagoToday()),
   });
 }
@@ -61,7 +75,17 @@ export function useStartTime() {
 export function useStopTime() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => stopTime(),
+    mutationFn: async () => {
+      try {
+        return await stopTime();
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline("time_stop", {});
+          return { ok: true, message: "queued", queued: true as const };
+        }
+        throw error;
+      }
+    },
     onSuccess: () => invalidateTimeQueries(queryClient, chicagoToday()),
   });
 }

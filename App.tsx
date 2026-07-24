@@ -14,6 +14,7 @@ import {
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { useOutboxBootstrap } from "./src/hooks/useOutboxBootstrap";
 import { BriefingScreen } from "./src/screens/BriefingScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
@@ -114,10 +115,16 @@ function RootTabs() {
   );
 }
 
+function OutboxBootstrap() {
+  useOutboxBootstrap();
+  return null;
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
+        <OutboxBootstrap />
         <NavigationContainer>
           <StatusBar style="dark" />
           <RootTabs />

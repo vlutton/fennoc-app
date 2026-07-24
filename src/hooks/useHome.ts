@@ -24,6 +24,7 @@ import type {
   Status,
   Task,
 } from "../api/types";
+import { enqueueIfOffline, isNetworkError } from "../outbox";
 
 export const homeQueryKeys = {
   status: ["status"] as const,
@@ -79,13 +80,23 @@ export function useCheckinCoverage(
 export function useReplyCheckin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       text,
       questionType,
     }: {
       text: string;
       questionType: string;
-    }): Promise<CheckinReply> => replyCheckin(text, questionType),
+    }): Promise<CheckinReply & { queued?: true }> => {
+      try {
+        return await replyCheckin(text, questionType);
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline("checkin_reply", { text, questionType });
+          return { ok: true, ack: "queued", queued: true };
+        }
+        throw error;
+      }
+    },
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({
@@ -100,12 +111,29 @@ export function useReplyCheckin() {
 
 export function useCapture() {
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       text,
       opts,
     }: {
       text: string;
       opts?: CaptureOpts;
-    }): Promise<CaptureResult> => capture(text, opts),
+    }): Promise<CaptureResult & { queued?: true }> => {
+      try {
+        return await capture(text, opts);
+      } catch (error) {
+        if (isNetworkError(error)) {
+          enqueueIfOffline(
+            "capture",
+            {
+              text,
+              source_ref: opts?.source_ref ?? "fennoc-app",
+            },
+            opts?.idempotency_key,
+          );
+          return { ok: true, event_id: null, queued: true };
+        }
+        throw error;
+      }
+    },
   });
 }

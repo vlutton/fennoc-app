@@ -1,4 +1,3 @@
-import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -9,20 +8,10 @@ import {
   View,
 } from "react-native";
 
-import { colors } from "../theme/colors";
 import { useCapture } from "../hooks/useHome";
-import { enqueueCapture } from "../outbox";
+import { colors } from "../theme/colors";
 
 type Feedback = "captured" | "queued" | "error" | null;
-
-function isNetworkError(error: unknown): boolean {
-  if (!isAxiosError(error)) return false;
-  return (
-    error.code === "ERR_NETWORK" ||
-    error.code === "ECONNABORTED" ||
-    !error.response
-  );
-}
 
 export function CaptureBar() {
   const [text, setText] = useState("");
@@ -62,21 +51,11 @@ export function CaptureBar() {
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
           setText("");
-          showFeedback("captured");
+          showFeedback(result.queued ? "queued" : "captured");
         },
         onError: (error) => {
-          if (isNetworkError(error)) {
-            enqueueCapture({
-              text: trimmed,
-              idempotency_key: idempotencyKey,
-              source_ref: "fennoc-app",
-            });
-            setText("");
-            showFeedback("queued");
-            return;
-          }
           const message =
             error instanceof Error ? error.message : "Capture failed";
           showFeedback("error", message);
