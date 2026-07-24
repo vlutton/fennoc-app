@@ -82,9 +82,9 @@ export async function getTasks(opts: GetTasksOpts = {}): Promise<Task[]> {
 }
 
 export async function briefingMorning(): Promise<Briefing> {
-  return request<Briefing>("GET", "/api/briefings/morning");
+  return request<Briefing>("GET", "/api/briefing/morning");
 }
 
 export async function briefingEvening(): Promise<Briefing> {
-  return request<Briefing>("GET", "/api/briefings/evening");
+  return request<Briefing>("GET", "/api/briefing/evening");
 }
