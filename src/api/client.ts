@@ -1,0 +1,90 @@
+import axios, {
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  isAxiosError,
+} from "axios";
+
+import type { Briefing, GetTasksOpts, HttpMethod, Status, Task } from "./types";
+import { getKey, useAuth } from "../store/useAuth";
+
+let client: AxiosInstance | null = null;
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+export async function getClient(): Promise<AxiosInstance> {
+  const { baseUrl, userId } = useAuth.getState();
+  const apiKey = (await getKey()) ?? "";
+
+  client = axios.create({
+    baseURL: normalizeBaseUrl(baseUrl),
+    timeout: 10_000,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      "X-Fennoc-User": userId || "vince",
+    },
+  });
+
+  return client;
+}
+
+export function resetClient(): void {
+  client = null;
+}
+
+export function formatApiError(error: unknown): string {
+  if (isAxiosError(error)) {
+    if (error.response) {
+      const detail =
+        typeof error.response.data === "object" &&
+        error.response.data !== null &&
+        "detail" in error.response.data
+          ? String((error.response.data as { detail: unknown }).detail)
+          : error.message;
+      return `${error.response.status}: ${detail}`;
+    }
+    if (error.code === "ECONNABORTED") {
+      return "Request timed out";
+    }
+    return error.message || "Network error";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown error";
+}
+
+export async function request<T>(
+  method: HttpMethod,
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  const instance = await getClient();
+  const response = await instance.request<T>({
+    method,
+    url: path,
+    data: body,
+    ...config,
+  });
+  return response.data;
+}
+
+export async function getStatus(): Promise<Status> {
+  return request<Status>("GET", "/api/status");
+}
+
+export async function getTasks(opts: GetTasksOpts = {}): Promise<Task[]> {
+  return request<Task[]>("GET", "/api/tasks", undefined, { params: opts });
+}
+
+export async function briefingMorning(): Promise<Briefing> {
+  return request<Briefing>("GET", "/api/briefings/morning");
+}
+
+export async function briefingEvening(): Promise<Briefing> {
+  return request<Briefing>("GET", "/api/briefings/evening");
+}

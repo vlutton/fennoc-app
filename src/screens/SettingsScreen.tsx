@@ -1,0 +1,212 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { formatApiError, getStatus, resetClient } from "../api/client";
+import type { Status } from "../api/types";
+import {
+  getKey,
+  setKey,
+  useAuth,
+  type ThemePreference,
+} from "../store/useAuth";
+import { colors } from "../theme/colors";
+
+type ConnectionState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ok"; status: Status }
+  | { kind: "error"; message: string };
+
+const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
+
+export function SettingsScreen() {
+  const baseUrl = useAuth((s) => s.baseUrl);
+  const userId = useAuth((s) => s.userId);
+  const theme = useAuth((s) => s.theme);
+  const setBaseUrl = useAuth((s) => s.setBaseUrl);
+  const setUserId = useAuth((s) => s.setUserId);
+  const setTheme = useAuth((s) => s.setTheme);
+
+  const [urlDraft, setUrlDraft] = useState(baseUrl);
+  const [userDraft, setUserDraft] = useState(userId);
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [keyLoaded, setKeyLoaded] = useState(false);
+  const [connection, setConnection] = useState<ConnectionState>({
+    kind: "idle",
+  });
+
+  useEffect(() => {
+    setUrlDraft(baseUrl);
+  }, [baseUrl]);
+
+  useEffect(() => {
+    setUserDraft(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await getKey();
+      if (!cancelled) {
+        setApiKeyDraft(stored ?? "");
+        setKeyLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const persistFields = useCallback(async () => {
+    const nextUrl = urlDraft.trim() || baseUrl;
+    const nextUser = userDraft.trim() || "vince";
+    setBaseUrl(nextUrl);
+    setUserId(nextUser);
+    await setKey(apiKeyDraft.trim());
+    resetClient();
+    return { nextUrl, nextUser };
+  }, [apiKeyDraft, baseUrl, setBaseUrl, setUserId, urlDraft, userDraft]);
+
+  const onTestConnection = useCallback(async () => {
+    setConnection({ kind: "loading" });
+    try {
+      await persistFields();
+      const status = await getStatus();
+      setConnection({ kind: "ok", status });
+    } catch (error) {
+      setConnection({ kind: "error", message: formatApiError(error) });
+    }
+  }, [persistFields]);
+
+  return (
+    <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-4 pb-8 pt-4"
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text className="text-base font-semibold leading-6 text-olive">
+          Settings
+        </Text>
+        <Text className="mt-1 text-base leading-6 text-terracotta">
+          Connect this phone to your Fennoc API over Tailscale.
+        </Text>
+
+        <FieldLabel label="Tailscale URL" />
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          onChangeText={setUrlDraft}
+          placeholder="https://host.tailnet.ts.net:8643"
+          placeholderTextColor="#9CA38A"
+          value={urlDraft}
+        />
+
+        <FieldLabel label="API key" />
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          onChangeText={setApiKeyDraft}
+          placeholder={keyLoaded ? "Bearer token" : "Loading…"}
+          placeholderTextColor="#9CA38A"
+          secureTextEntry
+          value={apiKeyDraft}
+        />
+
+        <FieldLabel label="User ID" />
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          onChangeText={setUserDraft}
+          placeholder="vince"
+          placeholderTextColor="#9CA38A"
+          value={userDraft}
+        />
+
+        <Pressable
+          accessibilityRole="button"
+          className="mt-6 min-h-12 items-center justify-center rounded-lg bg-terracotta px-4 active:opacity-80"
+          disabled={connection.kind === "loading"}
+          onPress={onTestConnection}
+        >
+          {connection.kind === "loading" ? (
+            <ActivityIndicator color={colors.cream} />
+          ) : (
+            <Text className="text-base font-semibold leading-6 text-cream">
+              Test Connection
+            </Text>
+          )}
+        </Pressable>
+
+        <View className="mt-4 rounded-xl bg-sand p-4">
+          {connection.kind === "idle" && (
+            <Text className="text-base leading-6 text-olive">
+              Not tested yet.
+            </Text>
+          )}
+          {connection.kind === "loading" && (
+            <Text className="text-base leading-6 text-olive">
+              Checking…
+            </Text>
+          )}
+          {connection.kind === "ok" && (
+            <Text className="text-base leading-6 text-olive">
+              ✅ Connected — open {connection.status.open} / completed{" "}
+              {connection.status.completed} / overdue{" "}
+              {connection.status.overdue}
+            </Text>
+          )}
+          {connection.kind === "error" && (
+            <Text className="text-base leading-6 text-olive">
+              ❌ Failed: {connection.message}
+            </Text>
+          )}
+        </View>
+
+        <FieldLabel label="Theme" />
+        <View className="flex-row gap-2">
+          {THEME_OPTIONS.map((option) => {
+            const active = theme === option;
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                className={`min-h-12 min-w-12 flex-1 items-center justify-center rounded-lg px-3 ${
+                  active ? "bg-olive" : "bg-sand"
+                }`}
+                onPress={() => setTheme(option)}
+              >
+                <Text
+                  className={`text-base font-medium capitalize leading-6 ${
+                    active ? "text-cream" : "text-olive"
+                  }`}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function FieldLabel({ label }: { label: string }) {
+  return (
+    <Text className="mb-2 mt-5 text-base font-medium leading-6 text-olive">
+      {label}
+    </Text>
+  );
+}
