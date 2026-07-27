@@ -37,6 +37,8 @@ export interface GetTasksOpts {
   due_before?: string;
   due_after?: string;
   source?: string;
+  /** Server-side filter on labels containing domain:work|personal. */
+  domain?: "work" | "personal";
   limit?: number;
 }
 

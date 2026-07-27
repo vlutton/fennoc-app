@@ -23,11 +23,18 @@ import {
 import { colors } from "../theme/colors";
 
 type Segment = "all" | "today" | "overdue";
+type DomainFilter = "all" | "work" | "personal";
 
 const SEGMENTS: { id: Segment; label: string }[] = [
   { id: "all", label: "All" },
   { id: "today", label: "Today" },
   { id: "overdue", label: "Overdue" },
+];
+
+const DOMAIN_SEGMENTS: { id: DomainFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "work", label: "Work" },
+  { id: "personal", label: "Personal" },
 ];
 
 const EMPTY_COPY: Record<Segment, string> = {
@@ -36,10 +43,28 @@ const EMPTY_COPY: Record<Segment, string> = {
   overdue: "Nothing overdue. 🔥",
 };
 
+function emptyCopy(segment: Segment, domain: DomainFilter): string {
+  if (domain === "all") return EMPTY_COPY[segment];
+  if (domain === "work") {
+    if (segment === "today") return "No work tasks due today.";
+    if (segment === "overdue") return "No overdue work tasks.";
+    return "No work tasks.";
+  }
+  if (segment === "today") return "No personal tasks due today.";
+  if (segment === "overdue") return "No overdue personal tasks.";
+  return "No personal tasks.";
+}
+
 export function TaskListScreen() {
   const [segment, setSegment] = useState<Segment>("all");
+  const [domainFilter, setDomainFilter] = useState<DomainFilter>("all");
 
-  const allQuery = useTasks({ status: "open" });
+  // All segment: server-side domain filter via ?domain=
+  const allQuery = useTasks({
+    status: "open",
+    domain: domainFilter === "all" ? undefined : domainFilter,
+  });
+  // Today/Overdue endpoints don't take domain — filter client-side below.
   const todayQuery = useTodayTasks();
   const overdueQuery = useOverdueTasks();
   const completeMutation = useCompleteTask();
@@ -51,9 +76,15 @@ export function TaskListScreen() {
     return allQuery;
   }, [allQuery, overdueQuery, segment, todayQuery]);
 
-  const tasks = activeQuery.data ?? [];
-  const busy =
-    completeMutation.isPending || dropMutation.isPending;
+  const tasks = useMemo(() => {
+    const raw = activeQuery.data ?? [];
+    // Server already filtered the All segment; only client-slice Today/Overdue.
+    if (segment === "all" || domainFilter === "all") return raw;
+    const needle = `domain:${domainFilter}`;
+    return raw.filter((t) => t.labels.includes(needle));
+  }, [activeQuery.data, domainFilter, segment]);
+
+  const busy = completeMutation.isPending || dropMutation.isPending;
 
   const onComplete = useCallback(
     (task: Task) => {
@@ -93,7 +124,34 @@ export function TaskListScreen() {
         <Text className="text-base font-semibold leading-6 text-olive">
           Tasks
         </Text>
+
+        {/* Domain filter (orthogonal, above time filter) */}
         <View className="mt-3 flex-row rounded-xl bg-sand p-1">
+          {DOMAIN_SEGMENTS.map((item) => {
+            const active = domainFilter === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                className={`min-h-12 flex-1 items-center justify-center rounded-lg px-2 ${
+                  active ? "bg-olive" : "bg-transparent"
+                }`}
+                onPress={() => setDomainFilter(item.id)}
+              >
+                <Text
+                  className={`text-base font-semibold leading-6 ${
+                    active ? "text-cream" : "text-olive"
+                  }`}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Time filter (existing) */}
+        <View className="mt-2 flex-row rounded-xl bg-sand p-1">
           {SEGMENTS.map((item) => {
             const active = segment === item.id;
             return (
@@ -151,7 +209,7 @@ export function TaskListScreen() {
           ListEmptyComponent={
             <View className="mt-16 items-center px-4">
               <Text className="text-center text-base leading-6 text-olive">
-                {EMPTY_COPY[segment]}
+                {emptyCopy(segment, domainFilter)}
               </Text>
             </View>
           }

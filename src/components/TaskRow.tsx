@@ -38,7 +38,11 @@ export function TaskRow({ task, onComplete, onDrop, busy = false }: TaskRowProps
       {task.labels.length > 0 ? (
         <View className="mt-2 flex-row flex-wrap gap-2">
           {task.labels.map((label) => (
-            <Pill key={`${task.task_id}-${label}`} label={label} variant="label" />
+            <Pill
+              key={`${task.task_id}-${label}`}
+              label={label}
+              variant={label.startsWith("domain:") ? "domain" : "label"}
+            />
           ))}
         </View>
       ) : null}

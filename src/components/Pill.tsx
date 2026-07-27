@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 
-type PillVariant = "project" | "priority" | "label";
+type PillVariant = "project" | "priority" | "label" | "domain";
 
 interface PillProps {
   label: string;
@@ -31,26 +31,51 @@ function priorityTextClasses(priority: number | undefined): string {
   }
 }
 
-function containerClasses(variant: PillVariant, priority?: number): string {
+function domainContainerClasses(label: string): string {
+  if (label === "domain:work" || label === "Work") {
+    return "bg-cream border-terracotta";
+  }
+  if (label === "domain:personal" || label === "Personal") {
+    return "bg-sand border-sand";
+  }
+  return "bg-cream border-sand";
+}
+
+function prettifyDomainLabel(label: string): string {
+  if (label === "domain:work") return "Work";
+  if (label === "domain:personal") return "Personal";
+  return label;
+}
+
+function containerClasses(
+  variant: PillVariant,
+  priority: number | undefined,
+  label: string,
+): string {
   if (variant === "priority") return priorityClasses(priority);
   if (variant === "project") return "bg-sand border-sand";
+  if (variant === "domain") return domainContainerClasses(label);
   return "bg-cream border-sand";
 }
 
 function textClasses(variant: PillVariant, priority?: number): string {
   if (variant === "priority") return priorityTextClasses(priority);
+  if (variant === "domain") return "text-olive";
   return "text-olive";
 }
 
 export function Pill({ label, variant, priority }: PillProps) {
+  const display =
+    variant === "domain" ? prettifyDomainLabel(label) : label;
+
   return (
     <View
-      className={`rounded-lg border px-2 py-1 ${containerClasses(variant, priority)}`}
+      className={`rounded-lg border px-2 py-1 ${containerClasses(variant, priority, label)}`}
     >
       <Text
         className={`text-xs font-medium leading-4 ${textClasses(variant, priority)}`}
       >
-        {label}
+        {display}
       </Text>
     </View>
   );
