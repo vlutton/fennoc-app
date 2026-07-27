@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Downloaded Expo Go client (208MB) — never commit
+Expo-Go-*.apk
+*.apk

@@ -6,6 +6,7 @@ import axios, {
 
 import type {
   Briefing,
+  Budget,
   CaptureOpts,
   CaptureResult,
   CheckinCoverage,
@@ -181,4 +182,12 @@ export async function capture(
     idempotency_key: opts?.idempotency_key,
     source_ref: opts?.source_ref ?? "fennoc-app",
   });
+}
+
+export async function getBudget(): Promise<Budget> {
+  return request<Budget>("GET", "/api/budget");
+}
+
+export async function setBudgetLimit(limit: number): Promise<Budget> {
+  return request<Budget>("PATCH", "/api/budget", { limit });
 }

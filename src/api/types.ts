@@ -103,3 +103,12 @@ export interface CheckinCoverage {
   answered: number;
   total: number;
 }
+
+export interface Budget {
+  limit: number;
+  spent: number;
+  remaining: number;
+  deferred: number;
+  quiet_hours: boolean;
+  reset_at: string; // ISO 8601 local-time STRING on the wire — NOT a Date
+}
