@@ -41,7 +41,12 @@ export const useAuth = create<AuthState>()(
     (set) => ({
       baseUrl: DEFAULT_BASE_URL,
       userId: DEFAULT_USER_ID,
-      theme: "system",
+      // Night is the product default, not "follow the OS". Verified on an
+      // Android 15 emulator: with "system" here, a fresh install on a
+      // light-mode device renders the day palette, which is the opposite of
+      // the intended first impression. "system" and "day" remain options in
+      // Settings; they are just not the default.
+      theme: "night",
       hydrated: false,
       setBaseUrl: (baseUrl) => set({ baseUrl }),
       setUserId: (userId) => set({ userId }),
