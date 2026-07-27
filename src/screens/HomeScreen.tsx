@@ -139,7 +139,11 @@ export function HomeScreen() {
             </Pressable>
           </View>
         ) : statusQuery.data ? (
-          <StatusStrip status={statusQuery.data} todayCount={todayCount} />
+          // StatusStrip was rewritten for INT-023 (thread shell) and is now
+          // self-contained — it reads the budget/connection state itself
+          // and no longer takes status/count props. This screen is unused
+          // (the thread is root now) but kept on disk for a later pass.
+          <StatusStrip />
         ) : null}
 
         <Text className="mb-2 text-base font-semibold leading-6 text-olive">

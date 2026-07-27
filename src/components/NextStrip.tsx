@@ -1,0 +1,142 @@
+import { useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
+
+import { useTodayTasks } from "../hooks/useTasks";
+import { useOpenTimer, useStartTime, useStopTime } from "../hooks/useTime";
+import { formatClock } from "../utils/format";
+
+const ROW_CLASS =
+  "mx-4 mb-3 min-h-[64px] flex-row items-center gap-3 rounded-md px-4 py-3";
+
+function NextLabel() {
+  return (
+    <>
+      <Text
+        className="w-10 font-mono-medium text-ink-muted"
+        numberOfLines={1}
+        style={{ fontSize: 10.5, lineHeight: 13 }}
+      >
+        NEXT
+      </Text>
+      <View className="h-6 w-px bg-line-hairline" />
+    </>
+  );
+}
+
+/**
+ * Persistent slot directly above the capture bar. Shows exactly one thing,
+ * never a list, and never disappears — including the empty state — so the
+ * layout never shifts under a thumb already moving toward the capture bar.
+ *
+ * Four states from the design: scheduled/read-only, actionable, running
+ * (merges with the timer), empty. This shell wires running (the open
+ * timer) and actionable (the next open task, with a Start action) from the
+ * existing hooks; a genuine "scheduled, read-only" source (e.g. a calendar
+ * item) doesn't exist on the backend yet, so it falls through to the same
+ * actionable rendering as the next task. No new backend calls are made.
+ */
+export function NextStrip() {
+  const openTimerQuery = useOpenTimer();
+  const stopTimeMutation = useStopTime();
+  const startTimeMutation = useStartTime();
+  const todayTasksQuery = useTodayTasks();
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const timer = openTimerQuery.data;
+  const running = timer?.active === true;
+
+  useEffect(() => {
+    if (!running || !timer?.started_at) return;
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running, timer?.started_at]);
+
+  if (running && timer) {
+    const startedAt = timer.started_at ? Date.parse(timer.started_at) : NaN;
+    const elapsedMs = Number.isFinite(startedAt) ? nowMs - startedAt : 0;
+
+    return (
+      <View className={`${ROW_CLASS} border border-signal bg-signal-wash`}>
+        <NextLabel />
+        <View className="flex-1">
+          <Text
+            className="font-mono-medium text-body text-signal"
+            numberOfLines={1}
+          >
+            {formatClock(elapsedMs)}
+          </Text>
+          <Text
+            className="font-sans text-dataSm text-ink-secondary"
+            numberOfLines={1}
+          >
+            RUNNING
+            {timer.category ? ` · ${timer.category.toUpperCase()}` : ""}
+            {timer.label ? ` · ${timer.label}` : ""}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityLabel="Stop timer"
+          accessibilityRole="button"
+          className="h-touch items-center justify-center rounded-sm bg-signal px-4 active:opacity-80"
+          disabled={stopTimeMutation.isPending}
+          onPress={() => stopTimeMutation.mutate()}
+        >
+          <Text className="font-sans-semibold text-label text-signal-on">
+            Stop
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const nextTask = todayTasksQuery.data?.[0];
+
+  if (nextTask) {
+    return (
+      <View className={`${ROW_CLASS} border border-line-hairline bg-bg-raised`}>
+        <NextLabel />
+        <View className="flex-1">
+          <Text className="font-sans text-body text-ink" numberOfLines={1}>
+            {nextTask.title}
+          </Text>
+          <Text
+            className="font-mono-medium text-dataSm text-ink-muted"
+            numberOfLines={1}
+          >
+            {(nextTask.project || "TASK").toUpperCase()}
+            {nextTask.due_date ? " · DUE TODAY" : ""}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityLabel={`Start ${nextTask.title}`}
+          accessibilityRole="button"
+          className="h-touch items-center justify-center rounded-sm border border-line-strong px-4 active:opacity-80"
+          disabled={startTimeMutation.isPending}
+          onPress={() =>
+            startTimeMutation.mutate({
+              category: "work",
+              label: nextTask.title,
+            })
+          }
+        >
+          <Text className="font-sans-medium text-label text-ink">Start</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      className={`${ROW_CLASS} border border-dashed border-line-strong opacity-70`}
+    >
+      <NextLabel />
+      <Text
+        className="flex-1 font-sans text-body text-ink-muted"
+        numberOfLines={1}
+      >
+        Nothing scheduled.
+      </Text>
+    </View>
+  );
+}

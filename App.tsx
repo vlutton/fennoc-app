@@ -1,65 +1,38 @@
 import "./src/global.css";
 
 import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import {
-  Clock,
-  FileText,
-  House,
-  ListChecks,
-  Settings,
-} from "lucide-react-native";
-import { useEffect, useMemo } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { X } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useOutboxBootstrap } from "./src/hooks/useOutboxBootstrap";
 import { initNotifications } from "./src/notifications";
-import { BriefingScreen } from "./src/screens/BriefingScreen";
-import { HomeScreen } from "./src/screens/HomeScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
-import { TaskListScreen } from "./src/screens/TaskListScreen";
-import { TimeScreen } from "./src/screens/TimeScreen";
+import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { useAuth } from "./src/store/useAuth";
 import { useTheme } from "./src/theme/useTheme";
 
-const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
 
-// Layout-only; colour comes from the active palette (see `useTheme`) so the
-// tab bar actually responds to the night/day toggle.
-const tabBarStyles = StyleSheet.create({
-  bar: {
-    height: 64,
-    paddingBottom: 8,
-    paddingTop: 8,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-});
-
-function RootTabs() {
+// The thread is the whole app now (INT-023): no tab bar, no other root
+// screen. Settings is reachable via a long-press on the Fennoc mark in the
+// app bar, presented here as a full-screen Modal rather than a navigator
+// route — SettingsScreen itself is untouched, this just supplies the
+// close affordance it lost when it left the tab bar.
+function Root() {
   const hydrated = useAuth((s) => s.hydrated);
   const { palette } = useTheme();
-
-  const tabBarColorStyle = useMemo(
-    () => ({
-      backgroundColor: palette.bg.raised,
-      borderTopColor: palette.line.strong,
-    }),
-    [palette],
-  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!hydrated) {
     return (
       <View className="flex-1 items-center justify-center bg-bg-base">
         <ActivityIndicator color={palette.ink.DEFAULT} size="large" />
-        <Text className="mt-3 text-base leading-6 text-ink">
+        <Text className="mt-3 font-sans text-body text-ink">
           Loading Fennoc…
         </Text>
       </View>
@@ -68,61 +41,28 @@ function RootTabs() {
 
   return (
     <View className="flex-1 bg-bg-base">
-      <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: palette.clay,
-          tabBarInactiveTintColor: palette.ink.DEFAULT,
-          tabBarStyle: [tabBarStyles.bar, tabBarColorStyle],
-          tabBarLabelStyle: tabBarStyles.label,
-        }}
+      <ThreadScreen onOpenSettings={() => setSettingsOpen(true)} />
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setSettingsOpen(false)}
+        visible={settingsOpen}
       >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <House color={color} size={size} strokeWidth={1.75} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Tasks"
-          component={TaskListScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <ListChecks color={color} size={size} strokeWidth={1.75} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Time"
-          component={TimeScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <Clock color={color} size={size} strokeWidth={1.75} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Briefings"
-          component={BriefingScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <FileText color={color} size={size} strokeWidth={1.75} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <Settings color={color} size={size} strokeWidth={1.75} />
-            ),
-          }}
-        />
-      </Tab.Navigator>
+        <View className="h-16 flex-row items-center justify-between border-b border-line-hairline bg-bg-base px-4">
+          <Text className="font-sans-semibold text-heading text-ink">
+            Settings
+          </Text>
+          <Pressable
+            accessibilityLabel="Close settings"
+            accessibilityRole="button"
+            className="h-touch w-touch items-center justify-center"
+            onPress={() => setSettingsOpen(false)}
+          >
+            <X color={palette.ink.DEFAULT} size={24} />
+          </Pressable>
+        </View>
+        <SettingsScreen />
+      </Modal>
     </View>
   );
 }
@@ -193,7 +133,7 @@ export default function App() {
           <NotificationsBootstrap />
           <NavigationContainer>
             <StatusBar style={statusBarStyle} />
-            <RootTabs />
+            <Root />
           </NavigationContainer>
         </QueryClientProvider>
       </SafeAreaProvider>
