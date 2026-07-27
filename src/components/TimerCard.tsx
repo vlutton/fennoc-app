@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import type { OpenTimer } from "../api/types";
-import { colors } from "../theme/colors";
+import { colors, nightPalette } from "../theme/colors";
 import { formatClock } from "../utils/format";
 
 export const TIME_CATEGORIES = [
@@ -132,7 +132,7 @@ export function TimerCard({
         className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
         onChangeText={setLabel}
         placeholder="coding"
-        placeholderTextColor="#9CA38A"
+        placeholderTextColor={nightPalette.ink.muted}
         value={label}
       />
 

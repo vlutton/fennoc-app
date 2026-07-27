@@ -8,7 +8,22 @@ const DEFAULT_BASE_URL =
   "https://vinces-macbook-air.tail46861b.ts.net:8643";
 const DEFAULT_USER_ID = "vince";
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "night" | "day" | "system";
+
+/**
+ * Older installs persisted `theme` as "light" | "dark" | "system" (the
+ * values were renamed to match the design's night/day vocabulary). Normalize
+ * anything else unrecognized to "system" too, so a corrupt/future value
+ * never crashes the app on launch.
+ */
+function normalizeThemePreference(value: unknown): ThemePreference {
+  if (value === "night" || value === "day" || value === "system") {
+    return value;
+  }
+  if (value === "dark") return "night";
+  if (value === "light") return "day";
+  return "system";
+}
 
 interface AuthState {
   baseUrl: string;
@@ -36,6 +51,23 @@ export const useAuth = create<AuthState>()(
     {
       name: "fennoc-auth",
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      // Runs once for any install that persisted state before this version
+      // (i.e. anything with the old "light" | "dark" | "system" theme
+      // values, or no version at all). Always returns a fully-populated,
+      // normalized shape so a missing/garbled field can't crash rehydration.
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Partial<{
+          baseUrl: string;
+          userId: string;
+          theme: unknown;
+        }>;
+        return {
+          baseUrl: state.baseUrl ?? DEFAULT_BASE_URL,
+          userId: state.userId ?? DEFAULT_USER_ID,
+          theme: normalizeThemePreference(state.theme),
+        };
+      },
       partialize: (state) => ({
         baseUrl: state.baseUrl,
         userId: state.userId,

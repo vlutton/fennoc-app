@@ -17,7 +17,7 @@ import {
   useAuth,
   type ThemePreference,
 } from "../store/useAuth";
-import { colors } from "../theme/colors";
+import { colors, nightPalette } from "../theme/colors";
 
 type ConnectionState =
   | { kind: "idle" }
@@ -25,7 +25,7 @@ type ConnectionState =
   | { kind: "ok"; status: Status }
   | { kind: "error"; message: string };
 
-const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
+const THEME_OPTIONS: ThemePreference[] = ["night", "day", "system"];
 
 export function SettingsScreen() {
   const baseUrl = useAuth((s) => s.baseUrl);
@@ -107,7 +107,7 @@ export function SettingsScreen() {
           className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
           onChangeText={setUrlDraft}
           placeholder="https://host.tailnet.ts.net:8643"
-          placeholderTextColor="#9CA38A"
+          placeholderTextColor={nightPalette.ink.muted}
           value={urlDraft}
         />
 
@@ -118,7 +118,7 @@ export function SettingsScreen() {
           className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
           onChangeText={setApiKeyDraft}
           placeholder={keyLoaded ? "Bearer token" : "Loading…"}
-          placeholderTextColor="#9CA38A"
+          placeholderTextColor={nightPalette.ink.muted}
           secureTextEntry
           value={apiKeyDraft}
         />
@@ -130,7 +130,7 @@ export function SettingsScreen() {
           className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
           onChangeText={setUserDraft}
           placeholder="vince"
-          placeholderTextColor="#9CA38A"
+          placeholderTextColor={nightPalette.ink.muted}
           value={userDraft}
         />
 

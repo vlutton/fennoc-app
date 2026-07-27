@@ -11,6 +11,7 @@ import {
   ListChecks,
   Settings,
 } from "lucide-react-native";
+import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -21,15 +22,15 @@ import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
 import { TimeScreen } from "./src/screens/TimeScreen";
 import { useAuth } from "./src/store/useAuth";
-import { colors } from "./src/theme/colors";
+import { useTheme } from "./src/theme/useTheme";
 
 const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
 
+// Layout-only; colour comes from the active palette (see `useTheme`) so the
+// tab bar actually responds to the night/day toggle.
 const tabBarStyles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.sand,
-    borderTopColor: colors.cream,
     height: 64,
     paddingBottom: 8,
     paddingTop: 8,
@@ -42,12 +43,23 @@ const tabBarStyles = StyleSheet.create({
 
 function RootTabs() {
   const hydrated = useAuth((s) => s.hydrated);
+  const { palette, themeClass } = useTheme();
+
+  const tabBarColorStyle = useMemo(
+    () => ({
+      backgroundColor: palette.bg.raised,
+      borderTopColor: palette.line.strong,
+    }),
+    [palette],
+  );
 
   if (!hydrated) {
     return (
-      <View className="flex-1 items-center justify-center bg-sand">
-        <ActivityIndicator color={colors.olive} size="large" />
-        <Text className="mt-3 text-base leading-6 text-olive">
+      <View
+        className={`flex-1 items-center justify-center ${themeClass("bg-bg-base", "bg-day-base")}`}
+      >
+        <ActivityIndicator color={palette.ink.DEFAULT} size="large" />
+        <Text className={`mt-3 text-base leading-6 ${themeClass("text-ink", "text-day-ink")}`}>
           Loading Fennoc…
         </Text>
       </View>
@@ -55,13 +67,13 @@ function RootTabs() {
   }
 
   return (
-    <View className="flex-1 bg-sand">
+    <View className={`flex-1 ${themeClass("bg-bg-base", "bg-day-base")}`}>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.terracotta,
-          tabBarInactiveTintColor: colors.olive,
-          tabBarStyle: tabBarStyles.bar,
+          tabBarActiveTintColor: palette.clay,
+          tabBarInactiveTintColor: palette.ink.DEFAULT,
+          tabBarStyle: [tabBarStyles.bar, tabBarColorStyle],
           tabBarLabelStyle: tabBarStyles.label,
         }}
       >
@@ -121,12 +133,14 @@ function OutboxBootstrap() {
 }
 
 export default function App() {
+  const { statusBarStyle } = useTheme();
+
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <OutboxBootstrap />
         <NavigationContainer>
-          <StatusBar style="dark" />
+          <StatusBar style={statusBarStyle} />
           <RootTabs />
         </NavigationContainer>
       </QueryClientProvider>

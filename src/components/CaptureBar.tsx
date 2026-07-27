@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { useCapture } from "../hooks/useHome";
-import { colors } from "../theme/colors";
+import { colors, nightPalette } from "../theme/colors";
 
 type Feedback = "captured" | "queued" | "error" | null;
 
@@ -77,7 +77,7 @@ export function CaptureBar() {
           onChangeText={setText}
           onSubmitEditing={onSubmit}
           placeholder="Capture a thought…"
-          placeholderTextColor="#9CA38A"
+          placeholderTextColor={nightPalette.ink.muted}
           returnKeyType="send"
           value={text}
         />

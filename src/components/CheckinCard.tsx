@@ -8,7 +8,7 @@ import {
 } from "react-native";
 
 import type { CheckinCurrent, PendingCheckin } from "../api/types";
-import { colors } from "../theme/colors";
+import { colors, nightPalette } from "../theme/colors";
 
 interface CheckinCardProps {
   pending: PendingCheckin;
@@ -53,7 +53,7 @@ export function CheckinCard({
             editable={!sending}
             onChangeText={setText}
             placeholder="Your reply…"
-            placeholderTextColor="#9CA38A"
+            placeholderTextColor={nightPalette.ink.muted}
             value={text}
           />
           <View className="mt-3 flex-row justify-end">
