@@ -10,21 +10,122 @@
 //
 // Values copied verbatim from design_handoff_fennoc/README.md `## Design
 // tokens`. Do not hand-edit a hex here without updating the source doc.
-module.exports = {
-  colors: {
-    bg: { base: "#100E0B", raised: "#191512", overlay: "#1F1A16", float: "#241E19" },
-    line: { hairline: "#2B2521", strong: "#3A322B" },
-    ink: { DEFAULT: "#F2EAE0", secondary: "#B7ADA3", muted: "#8C8279", disabled: "#5C544D" },
-    signal: { DEFAULT: "#F0A93B", on: "#1A1206", wash: "#2A2114" },
-    positive: "#8FA167",
-    clay: "#A8705A",
-    alert: "#D4674A",
-    day: {
-      base: "#F7F1E8", raised: "#FFFCF7", overlay: "#FFFFFF",
-      hairline: "#E4DACB", strong: "#CFC2AE",
-      ink: "#1A1613", inkSecondary: "#57504A", inkMuted: "#7A7168",
-      signal: "#9A5B00", signalWash: "#F7E4C4",
-      positive: "#4E5C2E", clay: "#8A5342", alert: "#A33A1C",
-    },
+const colors = {
+  bg: { base: "#100E0B", raised: "#191512", overlay: "#1F1A16", float: "#241E19" },
+  line: { hairline: "#2B2521", strong: "#3A322B" },
+  ink: { DEFAULT: "#F2EAE0", secondary: "#B7ADA3", muted: "#8C8279", disabled: "#5C544D" },
+  signal: { DEFAULT: "#F0A93B", on: "#1A1206", wash: "#2A2114" },
+  positive: "#8FA167",
+  clay: "#A8705A",
+  alert: "#D4674A",
+  day: {
+    base: "#F7F1E8", raised: "#FFFCF7", overlay: "#FFFFFF",
+    hairline: "#E4DACB", strong: "#CFC2AE",
+    ink: "#1A1613", inkSecondary: "#57504A", inkMuted: "#7A7168",
+    signal: "#9A5B00", signalWash: "#F7E4C4",
+    positive: "#4E5C2E", clay: "#8A5342", alert: "#A33A1C",
+    // The three fields below have no day-mode value in design_handoff's
+    // README — they're unused today (no `bg-bg-float` / `text-ink-disabled`
+    // / `bg-signal-on` classNames exist anywhere, and colors.ts's `Palette`
+    // type never surfaces them to JS callers either). They're only defined
+    // here so every CSS variable tailwind.config.js references has SOME
+    // day-mode value once vars() swaps the palette; if any of these three
+    // become load-bearing, replace these with real design values.
+    float: "#FFFFFF", // day's overlay is already pure white; float can't go lighter
+    inkDisabled: "#9A8F82", // fainter than inkMuted, same direction as night's ratio
+    signalOn: "#FFFCF7", // day's signal is a dark amber (unlike night's bright one) — needs light "on" text, not dark
   },
 };
+
+// Space-separated "R G B" triple, the format `vars()` / the generated
+// `rgb(var(--x) / <alpha-value>)` Tailwind colours expect (no `rgb()`
+// wrapper, no commas).
+function hexToRgbTriple(hex) {
+  const value = hex.replace("#", "");
+  const r = parseInt(value.substring(0, 2), 16);
+  const g = parseInt(value.substring(2, 4), 16);
+  const b = parseInt(value.substring(4, 6), 16);
+  return `${r} ${g} ${b}`;
+}
+
+// Canonical map from each token's semantic path to the CSS custom property
+// name both tailwind.config.js (building `rgb(var(--x) / <alpha-value>)`
+// colours) and the runtime `vars()` call (src/theme/colors.ts /
+// src/theme/useTheme.ts) reference. Defined once here so the two can never
+// drift out of sync.
+const cssVarNames = {
+  bg: {
+    base: "--color-bg-base",
+    raised: "--color-bg-raised",
+    overlay: "--color-bg-overlay",
+    float: "--color-bg-float",
+  },
+  line: {
+    hairline: "--color-line-hairline",
+    strong: "--color-line-strong",
+  },
+  ink: {
+    DEFAULT: "--color-ink",
+    secondary: "--color-ink-secondary",
+    muted: "--color-ink-muted",
+    disabled: "--color-ink-disabled",
+  },
+  signal: {
+    DEFAULT: "--color-signal",
+    on: "--color-signal-on",
+    wash: "--color-signal-wash",
+  },
+  positive: "--color-positive",
+  clay: "--color-clay",
+  alert: "--color-alert",
+};
+
+function buildVars(palette) {
+  return {
+    [cssVarNames.bg.base]: hexToRgbTriple(palette.bg.base),
+    [cssVarNames.bg.raised]: hexToRgbTriple(palette.bg.raised),
+    [cssVarNames.bg.overlay]: hexToRgbTriple(palette.bg.overlay),
+    [cssVarNames.bg.float]: hexToRgbTriple(palette.bg.float),
+    [cssVarNames.line.hairline]: hexToRgbTriple(palette.line.hairline),
+    [cssVarNames.line.strong]: hexToRgbTriple(palette.line.strong),
+    [cssVarNames.ink.DEFAULT]: hexToRgbTriple(palette.ink.DEFAULT),
+    [cssVarNames.ink.secondary]: hexToRgbTriple(palette.ink.secondary),
+    [cssVarNames.ink.muted]: hexToRgbTriple(palette.ink.muted),
+    [cssVarNames.ink.disabled]: hexToRgbTriple(palette.ink.disabled),
+    [cssVarNames.signal.DEFAULT]: hexToRgbTriple(palette.signal.DEFAULT),
+    [cssVarNames.signal.on]: hexToRgbTriple(palette.signal.on),
+    [cssVarNames.signal.wash]: hexToRgbTriple(palette.signal.wash),
+    [cssVarNames.positive]: hexToRgbTriple(palette.positive),
+    [cssVarNames.clay]: hexToRgbTriple(palette.clay),
+    [cssVarNames.alert]: hexToRgbTriple(palette.alert),
+  };
+}
+
+// Space-separated RGB triples for each theme, ready to spread into
+// NativeWind's `vars()` at the app root (see src/theme/useTheme.ts).
+const nightVars = buildVars({
+  bg: colors.bg,
+  line: colors.line,
+  ink: colors.ink,
+  signal: colors.signal,
+  positive: colors.positive,
+  clay: colors.clay,
+  alert: colors.alert,
+});
+
+const dayVars = buildVars({
+  bg: { base: colors.day.base, raised: colors.day.raised, overlay: colors.day.overlay, float: colors.day.float },
+  line: { hairline: colors.day.hairline, strong: colors.day.strong },
+  ink: {
+    DEFAULT: colors.day.ink,
+    secondary: colors.day.inkSecondary,
+    muted: colors.day.inkMuted,
+    disabled: colors.day.inkDisabled,
+  },
+  signal: { DEFAULT: colors.day.signal, on: colors.day.signalOn, wash: colors.day.signalWash },
+  positive: colors.day.positive,
+  clay: colors.day.clay,
+  alert: colors.day.alert,
+});
+
+module.exports = { colors, cssVarNames, nightVars, dayVars };

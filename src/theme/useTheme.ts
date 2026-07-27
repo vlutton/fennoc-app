@@ -1,7 +1,8 @@
+import { vars } from "nativewind";
 import { useColorScheme } from "react-native";
 
 import { type ThemePreference, useAuth } from "../store/useAuth";
-import { dayPalette, nightPalette, type Palette } from "./colors";
+import { dayPalette, dayVars, nightPalette, nightVars, type Palette } from "./colors";
 
 export type ActiveTheme = "night" | "day";
 
@@ -34,19 +35,15 @@ export interface UseThemeResult {
   /** Resolved colour palette for the active theme. */
   palette: Palette;
   /**
-   * Pick between a night-palette Tailwind className and its day-palette
-   * counterpart based on the active theme, e.g.
-   * `themeClass("bg-bg-base", "bg-day-base")`.
-   *
-   * This — plain conditional classNames — is how night/day switching is
-   * wired, rather than Tailwind's `dark:` variant. On native, NativeWind's
-   * dark mode is a binary flag bound to `Appearance.setColorScheme` (a
-   * global, per-app OS override), not an arbitrary class-name matcher — that
-   * only works that way on web. Forcing it would also be semantically
-   * inverted here (night, not light, is our default) and would clobber our
-   * own read of the true system scheme for the "system" preference.
+   * NativeWind `vars()` style object for the active theme's CSS custom
+   * properties (`--color-bg-base`, `--color-ink`, etc — see
+   * src/theme/tokens.js). Apply it to a `style` prop on a root-level `View`
+   * (see App.tsx) and every descendant using `bg-bg-base`, `text-ink`,
+   * `bg-sand`, etc. re-themes automatically — no per-element theme
+   * awareness needed. Switching the active theme just swaps which vars()
+   * object is applied at the root.
    */
-  themeClass: (nightClassName: string, dayClassName: string) => string;
+  themeVars: ReturnType<typeof vars>;
   /** `expo-status-bar` style that keeps status bar content legible. */
   statusBarStyle: "light" | "dark";
 }
@@ -63,8 +60,7 @@ export function useTheme(): UseThemeResult {
     isDay,
     isNight: !isDay,
     palette: isDay ? dayPalette : nightPalette,
-    themeClass: (nightClassName, dayClassName) =>
-      isDay ? dayClassName : nightClassName,
+    themeVars: vars(isDay ? dayVars : nightVars),
     // Light content (white-ish icons/text) reads on the near-black night
     // palette; dark content reads on the light day palette.
     statusBarStyle: isDay ? "dark" : "light",

@@ -3,6 +3,7 @@ import "./src/global.css";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import {
   Clock,
@@ -43,7 +44,7 @@ const tabBarStyles = StyleSheet.create({
 
 function RootTabs() {
   const hydrated = useAuth((s) => s.hydrated);
-  const { palette, themeClass } = useTheme();
+  const { palette } = useTheme();
 
   const tabBarColorStyle = useMemo(
     () => ({
@@ -55,11 +56,9 @@ function RootTabs() {
 
   if (!hydrated) {
     return (
-      <View
-        className={`flex-1 items-center justify-center ${themeClass("bg-bg-base", "bg-day-base")}`}
-      >
+      <View className="flex-1 items-center justify-center bg-bg-base">
         <ActivityIndicator color={palette.ink.DEFAULT} size="large" />
-        <Text className={`mt-3 text-base leading-6 ${themeClass("text-ink", "text-day-ink")}`}>
+        <Text className="mt-3 text-base leading-6 text-ink">
           Loading Fennoc…
         </Text>
       </View>
@@ -67,7 +66,7 @@ function RootTabs() {
   }
 
   return (
-    <View className={`flex-1 ${themeClass("bg-bg-base", "bg-day-base")}`}>
+    <View className="flex-1 bg-bg-base">
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -133,17 +132,39 @@ function OutboxBootstrap() {
 }
 
 export default function App() {
-  const { statusBarStyle } = useTheme();
+  const { statusBarStyle, themeVars } = useTheme();
+
+  // Each weight is its own registered family name (see the fontFamily
+  // comment in tailwind.config.js for why: a single family + numeric
+  // fontWeight doesn't reliably select the right file on React Native).
+  const [fontsLoaded, fontError] = useFonts({
+    "InstrumentSans-400": require("./assets/fonts/InstrumentSans-400.ttf"),
+    "InstrumentSans-500": require("./assets/fonts/InstrumentSans-500.ttf"),
+    "InstrumentSans-600": require("./assets/fonts/InstrumentSans-600.ttf"),
+    "IBMPlexMono-400": require("./assets/fonts/IBMPlexMono-400.ttf"),
+    "IBMPlexMono-500": require("./assets/fonts/IBMPlexMono-500.ttf"),
+  });
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <OutboxBootstrap />
-        <NavigationContainer>
-          <StatusBar style={statusBarStyle} />
-          <RootTabs />
-        </NavigationContainer>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    // Root of the CSS-variable theme: `themeVars` sets the active palette's
+    // `--color-*` custom properties here, once. Every `bg-bg-base` /
+    // `text-ink` / `bg-sand` className anywhere in the tree resolves through
+    // those variables, so swapping `themeVars` (via useTheme()) re-themes
+    // the whole app without any component branching on the active theme.
+    <View style={themeVars} className="flex-1">
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <OutboxBootstrap />
+          <NavigationContainer>
+            <StatusBar style={statusBarStyle} />
+            <RootTabs />
+          </NavigationContainer>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </View>
   );
 }

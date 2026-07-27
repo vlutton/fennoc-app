@@ -11,10 +11,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icon-foreground.png",
+        "monochromeImage": "./assets/icon-monochrome.png",
+        "backgroundColor": "#100E0B"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.fennocapp"
@@ -23,7 +22,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/ic-stat-fennoc.png",
+          "color": "#F0A93B"
+        }
+      ]
     ],
     "extra": {
       "eas": {

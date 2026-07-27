@@ -12,6 +12,17 @@ import tokens from "./tokens";
 export type NightColors = typeof tokens.colors;
 export type DayColors = NightColors["day"];
 
+/**
+ * Space-separated "R G B" triples keyed by CSS custom property name (e.g.
+ * `--color-bg-base`), one map per theme. Feed either straight into
+ * NativeWind's `vars()` to produce the style object `useTheme()` returns as
+ * `themeVars` — see src/theme/useTheme.ts. Precomputed once in tokens.js so
+ * this file and tailwind.config.js can never reference different variable
+ * names for the same token.
+ */
+export const nightVars: Record<string, string> = tokens.nightVars;
+export const dayVars: Record<string, string> = tokens.dayVars;
+
 /** Raw token object, shaped exactly like `tailwind.config.js`'s theme.extend.colors. */
 export const rawTokens = tokens.colors;
 
