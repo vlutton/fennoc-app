@@ -12,11 +12,12 @@ import {
   ListChecks,
   Settings,
 } from "lucide-react-native";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useOutboxBootstrap } from "./src/hooks/useOutboxBootstrap";
+import { initNotifications } from "./src/notifications";
 import { BriefingScreen } from "./src/screens/BriefingScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
@@ -131,6 +132,36 @@ function OutboxBootstrap() {
   return null;
 }
 
+// Registers the four INT-020 notification channels/categories and installs
+// the foreground handler + response listener. Does NOT request permission —
+// that's asked late, at a real trigger moment (see src/notifications/
+// permissions.ts), never here at app mount.
+function NotificationsBootstrap() {
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    initNotifications()
+      .then((unsub) => {
+        if (cancelled) {
+          unsub();
+          return;
+        }
+        unsubscribe = unsub;
+      })
+      .catch((error) => {
+        console.warn("[notifications] init failed", error);
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
+
+  return null;
+}
+
 export default function App() {
   const { statusBarStyle, themeVars } = useTheme();
 
@@ -159,6 +190,7 @@ export default function App() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <OutboxBootstrap />
+          <NotificationsBootstrap />
           <NavigationContainer>
             <StatusBar style={statusBarStyle} />
             <RootTabs />

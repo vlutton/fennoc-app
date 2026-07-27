@@ -12,6 +12,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { formatApiError, getStatus, resetClient } from "../api/client";
 import type { Status } from "../api/types";
 import {
+  CHANNEL_IDS,
+  requestNotificationPermissionAsync,
+  triggerDevNotificationAsync,
+  type ChannelId,
+} from "../notifications";
+import {
   getKey,
   setKey,
   useAuth,
@@ -42,6 +48,7 @@ export function SettingsScreen() {
   const [connection, setConnection] = useState<ConnectionState>({
     kind: "idle",
   });
+  const [devNotifStatus, setDevNotifStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setUrlDraft(baseUrl);
@@ -85,6 +92,33 @@ export function SettingsScreen() {
       setConnection({ kind: "error", message: formatApiError(error) });
     }
   }, [persistFields]);
+
+  // Dev-only (INT-020 verification). Not a production permission-request
+  // moment — see src/notifications/permissions.ts for why this must never
+  // be the real call site.
+  const onRequestDevPermission = useCallback(async () => {
+    try {
+      const granted = await requestNotificationPermissionAsync();
+      setDevNotifStatus(
+        granted
+          ? "Permission granted."
+          : "Permission denied — enable it in system settings to see test notifications.",
+      );
+    } catch (error) {
+      setDevNotifStatus(`Permission request failed: ${formatApiError(error)}`);
+    }
+  }, []);
+
+  const onFireDevNotification = useCallback((channelId: ChannelId) => {
+    return async () => {
+      try {
+        await triggerDevNotificationAsync(channelId);
+        setDevNotifStatus(`Fired "${channelId}" — check the shade in ~1s.`);
+      } catch (error) {
+        setDevNotifStatus(`"${channelId}" failed: ${formatApiError(error)}`);
+      }
+    };
+  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
@@ -198,6 +232,50 @@ export function SettingsScreen() {
             );
           })}
         </View>
+
+        {__DEV__ ? (
+          <View className="mt-8 rounded-xl border border-sand bg-cream p-4">
+            <Text className="text-base font-semibold leading-6 text-olive">
+              Dev: notifications (INT-020)
+            </Text>
+            <Text className="mt-1 text-sm leading-5 text-olive opacity-70">
+              Local test pings only — no remote transport is wired up yet.
+              Grant permission once, then fire each channel to check its
+              importance, sound, and action set.
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              className="mt-4 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+              onPress={onRequestDevPermission}
+            >
+              <Text className="text-base font-semibold leading-6 text-signal-on">
+                Enable notifications
+              </Text>
+            </Pressable>
+
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {CHANNEL_IDS.map((channelId) => (
+                <Pressable
+                  key={channelId}
+                  accessibilityRole="button"
+                  className="min-h-12 min-w-24 flex-1 items-center justify-center rounded-lg bg-olive px-3 active:opacity-80"
+                  onPress={onFireDevNotification(channelId)}
+                >
+                  <Text className="text-base font-medium capitalize leading-6 text-cream">
+                    {channelId}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {devNotifStatus ? (
+              <Text className="mt-3 text-sm leading-5 text-olive">
+                {devNotifStatus}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
