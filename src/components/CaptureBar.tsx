@@ -46,6 +46,12 @@ export function CaptureBar() {
     if (clearTimer.current) clearTimeout(clearTimer.current);
     setFeedback(kind);
     setErrorMsg(msg ?? null);
+    // Success and queued self-clear — Fennoc doesn't announce that it did its
+    // job. An ERROR must not: it is telling you a thought did not save, and the
+    // text is still sitting in the composer waiting to be retried. Auto-hiding
+    // that after 1.5s is how a capture goes missing silently, which is the one
+    // outcome this product cannot afford. It clears on the next attempt.
+    if (kind === "error") return;
     clearTimer.current = setTimeout(() => {
       setFeedback(null);
       setErrorMsg(null);

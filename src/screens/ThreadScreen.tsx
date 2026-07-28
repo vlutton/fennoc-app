@@ -1,6 +1,6 @@
 import { isAxiosError } from "axios";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CaptureBar } from "../components/CaptureBar";
@@ -252,16 +252,28 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         <ThreadTerminus />
       </ScrollView>
 
-      {showCheckin && pendingQuery.data ? (
-        <CheckinCard
-          onReply={onCheckinReply}
-          pending={pendingQuery.data}
-          sending={replyMutation.isPending}
-        />
-      ) : null}
+      {/*
+        The manifest sets android:windowSoftInputMode="adjustResize", but Expo
+        enables edge-to-edge on Android by default and under edge-to-edge the
+        window no longer resizes for the keyboard — so the composer, the
+        check-in card, and any capture error message all end up UNDERNEATH it.
+        Reported from a real device: "the onscreen keyboard drew over the text
+        box so I could not see what I was typing."
 
-      <NextStrip />
-      <CaptureBar />
+        Everything the keyboard must not cover goes inside this.
+      */}
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0}>
+        {showCheckin && pendingQuery.data ? (
+          <CheckinCard
+            onReply={onCheckinReply}
+            pending={pendingQuery.data}
+            sending={replyMutation.isPending}
+          />
+        ) : null}
+
+        <NextStrip />
+        <CaptureBar />
+      </KeyboardAvoidingView>
 
       <LedgerSheet onClose={() => setLedgerOpen(false)} visible={ledgerOpen} />
     </SafeAreaView>
