@@ -100,7 +100,18 @@ export function TaskRow({ task, onComplete, onDrop, busy = false, held = false }
           disabled={busy}
           onPress={() => onDrop(task)}
         >
-          <Trash2 color={palette.alert} size={18} strokeWidth={2} />
+          {/*
+            `ink.muted`, not `alert`. The design reserves alert for "destructive
+            confirm only. Rare." — one drop control per row means alert on every
+            row of the ledger, which dilutes it exactly the way an over-used
+            `signal` would. Alert belongs on a confirm step, not on the resting
+            affordance.
+
+            TODO(INT-027): dropping is currently immediate and irreversible with
+            no confirm. The design's answer is the set-down flow, where nothing
+            is destroyed — items are handed over with a condition and come back.
+          */}
+          <Trash2 color={palette.ink.muted} size={18} strokeWidth={2} />
         </Pressable>
       ) : null}
     </View>

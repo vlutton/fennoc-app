@@ -1,11 +1,12 @@
 import { isAxiosError } from "axios";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
+import { LedgerSheet } from "../components/LedgerSheet";
 import { NextStrip } from "../components/NextStrip";
 import { StatusStrip } from "../components/StatusStrip";
 import { useEveningBriefing, useMorningBriefing } from "../hooks/useBriefing";
@@ -111,6 +112,7 @@ function ThreadTerminus() {
 export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   const { palette } = useTheme();
   const today = chicagoToday();
+  const [ledgerOpen, setLedgerOpen] = useState(false);
 
   const morningBriefing = useMorningBriefing(today);
   const eveningBriefing = useEveningBriefing(today);
@@ -162,7 +164,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   }, [captures, eveningBriefing.data, morningBriefing.data, today]);
 
   const onOpenLedger = () => {
-    // TODO(INT-024): open the ledger sheet. No-op until then.
+    setLedgerOpen(true);
   };
 
   const onCheckinReply = (text: string) => {
@@ -260,6 +262,8 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
 
       <NextStrip />
       <CaptureBar />
+
+      <LedgerSheet onClose={() => setLedgerOpen(false)} visible={ledgerOpen} />
     </SafeAreaView>
   );
 }
