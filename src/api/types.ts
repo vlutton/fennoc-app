@@ -1,37 +1,59 @@
-export interface Status {
-  open: number;
-  completed: number;
-  overdue: number;
-  checkin_coverage: { answered: number; total: number };
-}
+// Response-shape types below are ALIASES of the generated OpenAPI types in
+// `./schema.gen.ts` — they are not restated by hand. `schema.gen.ts` is
+// generated from fennoc-core's `api/server.py` Pydantic response models via
+// `npm run gen:api-schema && npm run gen:api-types` (see package.json). If a
+// response shape here looks wrong, the fix belongs in the Pydantic model on
+// the server, followed by regenerating — not by hand-editing this file.
+//
+// The export names are kept stable (Status, Task, Briefing, ...) so call
+// sites don't churn even though the underlying type now comes from
+// `components["schemas"][...]`.
+import type { components } from "./schema.gen";
 
-export interface Task {
-  task_id: string;
-  title: string;
-  project: string;
-  priority: number;
-  due_date: string | null;
-  labels: string[];
-  status: "open" | "completed" | "dropped";
-  source: string;
-  source_ref: string;
-  recurrence: string | null;
-  recurrence_parent_id: string | null;
-  created_at: string;
-  completed_at: string | null;
-  updated_at: string;
-  metadata: Record<string, unknown>;
-}
+export type Status = components["schemas"]["StatusResponse"];
 
-export interface Briefing {
-  text: string | null;
-  date: string | null; // "YYYY-MM-DD"
-}
+export type Task = components["schemas"]["TaskResponse"];
+
+export type Briefing = components["schemas"]["BriefingResponse"];
+
+/** metadata is a JSON STRING on the wire — NOT an object (see TimeBlockResponse in api/server.py). */
+export type TimeBlock = components["schemas"]["TimeBlockResponse"];
+
+export type OpenTimer = components["schemas"]["OpenTimerResponse"];
+
+export type PendingCheckin = components["schemas"]["PendingCheckinResponse"];
+
+export type CheckinReply = components["schemas"]["CheckinReplyResponse"];
+
+/** Check-in cursor from GET /api/time/current — distinct from OpenTimer (/api/time/open). */
+export type CheckinCurrent = components["schemas"]["CurrentActivityResponse"];
+
+export type CaptureResult = components["schemas"]["CaptureResponse"];
+
+export type CheckinCoverage = components["schemas"]["CheckinCoverageResponse"];
+
+export type Budget = components["schemas"]["BudgetResponse"];
+
+// ---------------------------------------------------------------------------
+// Hand-written types below.
+//
+// These are either not response bodies (so there's nothing in the OpenAPI
+// schema to derive them from — HttpMethod, the *Opts call-site shapes), or
+// encode client-side domain knowledge the generated schema can't express:
+// `tasks.status` and `tasks.labels` are plain `TEXT`/`str` columns in
+// fennoc-core (see fennoc/store/accessors.py's Task dataclass), so FastAPI
+// has no way to know they're restricted to a closed set of values — the
+// generated `TaskResponse.status` is just `string`. The literal unions here
+// are this app's own knowledge of the valid values, not derivable from the
+// schema.
+// ---------------------------------------------------------------------------
+
+export type TaskStatus = "open" | "completed" | "dropped";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface GetTasksOpts {
-  status?: Task["status"] | "all";
+  status?: TaskStatus | "all";
   project?: string;
   priority?: number;
   due_before?: string;
@@ -42,73 +64,12 @@ export interface GetTasksOpts {
   limit?: number;
 }
 
-export interface TimeBlock {
-  block_id: string;
-  started_at: string;
-  ended_at: string;
-  duration_s: number;
-  source: string;
-  category: string;
-  label: string;
-  confidence: string;
-  idempotency_key: string;
-  metadata: string; // JSON STRING on the wire — NOT an object
-  created_at: string;
-}
-
-export interface OpenTimer {
-  active: boolean;
-  started_at?: string;
-  label?: string;
-  category?: string;
-}
-
 export interface TimeStartOpts {
   category: string;
   label?: string;
 }
 
-export interface PendingCheckin {
-  pending: boolean;
-  id?: number;
-  sent_at?: string;
-  question_type?: string;
-  question_text?: string;
-}
-
-export interface CheckinReply {
-  ok: boolean;
-  ack: string;
-}
-
-/** Check-in cursor from GET /api/time/current — distinct from OpenTimer (/api/time/open). */
-export interface CheckinCurrent {
-  active: boolean;
-  category?: string;
-  label?: string;
-  started_at?: string;
-}
-
-export interface CaptureResult {
-  ok: boolean;
-  event_id: string | null;
-}
-
 export interface CaptureOpts {
   idempotency_key?: string;
   source_ref?: string;
-}
-
-export interface CheckinCoverage {
-  answered: number;
-  total: number;
-}
-
-export interface Budget {
-  limit: number;
-  spent: number;
-  remaining: number;
-  deferred: number;
-  quiet_hours: boolean;
-  reset_at: string; // ISO 8601 local-time STRING on the wire — NOT a Date
 }
