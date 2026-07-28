@@ -18,7 +18,6 @@ import { CheckinCard } from "../components/CheckinCard";
 import { StatusStrip } from "../components/StatusStrip";
 import { TodayTopTaskRow } from "../components/TodayTopTaskRow";
 import {
-  useCheckinCurrentActivity,
   usePendingCheckin,
   useReplyCheckin,
   useStatus,
@@ -42,22 +41,18 @@ export function HomeScreen() {
   const todayTop3Query = useTodayTop3();
   const todayAllQuery = useTodayTasks();
   const pendingQuery = usePendingCheckin();
-  const currentQuery = useCheckinCurrentActivity();
   const replyMutation = useReplyCheckin();
-  const [ack, setAck] = useState<string | null>(null);
   const [checkinHidden, setCheckinHidden] = useState(false);
 
   const onRefresh = useCallback(() => {
     setCheckinHidden(false);
-    setAck(null);
     void Promise.all([
       statusQuery.refetch(),
       todayTop3Query.refetch(),
       todayAllQuery.refetch(),
       pendingQuery.refetch(),
-      currentQuery.refetch(),
     ]);
-  }, [currentQuery, pendingQuery, statusQuery, todayAllQuery, todayTop3Query]);
+  }, [pendingQuery, statusQuery, todayAllQuery, todayTop3Query]);
 
   const goToTasks = useCallback(() => {
     navigation.navigate("Tasks");
@@ -70,13 +65,9 @@ export function HomeScreen() {
       replyMutation.mutate(
         { text, questionType: qt },
         {
-          onSuccess: (data) => {
-            setAck(data.ack);
-          },
           onError: (error) => {
             if (isAxiosError(error) && error.response?.status === 409) {
               setCheckinHidden(true);
-              setAck(null);
               void pendingQuery.refetch();
             }
           },
@@ -180,8 +171,6 @@ export function HomeScreen() {
 
         {showCheckin && pendingQuery.data ? (
           <CheckinCard
-            ack={ack}
-            currentActivity={currentQuery.data}
             onReply={onReply}
             pending={pendingQuery.data}
             sending={replyMutation.isPending}

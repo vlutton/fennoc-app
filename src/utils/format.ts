@@ -60,6 +60,16 @@ export function formatClock(elapsedMs: number): string {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+/** "HH:MM" 24h local time from an ISO timestamp. "" if missing/invalid. */
+export function formatTimeOfDay(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const hh = String(parsed.getHours()).padStart(2, "0");
+  const mm = String(parsed.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 /** Today's YYYY-MM-DD in America/Chicago. */
 export function chicagoToday(): string {
   return new Intl.DateTimeFormat("en-CA", {

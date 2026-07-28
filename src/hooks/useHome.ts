@@ -25,6 +25,7 @@ import type {
   Task,
 } from "../api/types";
 import { enqueueIfOffline, isNetworkError } from "../outbox";
+import { useThreadStore } from "../store/useThread";
 
 export const homeQueryKeys = {
   status: ["status"] as const,
@@ -134,6 +135,14 @@ export function useCapture() {
         }
         throw error;
       }
+    },
+    // Session-local thread bubble for what the user just said (INT-023b —
+    // see src/store/useThread.ts). Fires on both the online and the
+    // offline/queued path: the user spoke either way, independent of
+    // delivery status, and the bubble represents the utterance, not the
+    // delivery receipt.
+    onSuccess: (_result, variables) => {
+      useThreadStore.getState().addCapture(variables.text);
     },
   });
 }

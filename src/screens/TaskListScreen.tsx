@@ -20,6 +20,7 @@ import {
   useTasks,
   useTodayTasks,
 } from "../hooks/useTasks";
+import { useOutboxStore } from "../outbox";
 import { colors } from "../theme/colors";
 
 type Segment = "all" | "today" | "overdue";
@@ -69,6 +70,24 @@ export function TaskListScreen() {
   const overdueQuery = useOverdueTasks();
   const completeMutation = useCompleteTask();
   const dropMutation = useDropTask();
+
+  // Tasks whose complete/drop action is queued in the offline outbox and
+  // hasn't reached the server yet — rendered "held" (solid, dashed edge)
+  // rather than a spinner/disabled row. See TaskRow's `held` prop.
+  const outboxItems = useOutboxStore((s) => s.items);
+  const heldTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of outboxItems) {
+      if (
+        (item.kind === "complete" || item.kind === "drop") &&
+        (item.status === "pending" || item.status === "inflight")
+      ) {
+        const taskId = item.payload.taskId;
+        if (typeof taskId === "string") ids.add(taskId);
+      }
+    }
+    return ids;
+  }, [outboxItems]);
 
   const activeQuery = useMemo(() => {
     if (segment === "today") return todayQuery;
@@ -224,6 +243,7 @@ export function TaskListScreen() {
           renderItem={({ item }) => (
             <TaskRow
               busy={busy}
+              held={heldTaskIds.has(item.task_id)}
               onComplete={onComplete}
               onDrop={onDrop}
               task={item}
