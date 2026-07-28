@@ -10,7 +10,8 @@ import { NextStrip } from "../components/NextStrip";
 import { StatusStrip } from "../components/StatusStrip";
 import { useEveningBriefing, useMorningBriefing } from "../hooks/useBriefing";
 import { usePendingCheckin, useReplyCheckin } from "../hooks/useHome";
-import { useTodayCaptures } from "../store/useThread";
+import { useThreadStore, useTodayCaptures } from "../store/useThread";
+import { formatTimeOfDay } from "../utils/format";
 import { useTheme } from "../theme/useTheme";
 import { chicagoToday } from "../utils/format";
 
@@ -30,7 +31,24 @@ const EVENING_BRIEFING_TIME = "18:00";
 
 type ThreadMessage =
   | { id: string; kind: "fennoc-briefing"; atMs: number; stamp: string; label: string }
+  | { id: string; kind: "fennoc-line"; atMs: number; stamp: string; text: string }
   | { id: string; kind: "user-capture"; atMs: number; text: string };
+
+/**
+ * A plain thing Fennoc said — no action attached. Same unboxed treatment as
+ * FennocMessage but without the briefing's "Read briefing" affordance, since
+ * an acknowledgement has nothing to open.
+ */
+function FennocLine({ stamp, text }: { stamp: string; text: string }) {
+  return (
+    <View>
+      <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
+        {stamp}
+      </Text>
+      <Text className="mt-1 font-sans text-lead text-ink">{text}</Text>
+    </View>
+  );
+}
 
 /** Fennoc speaks unboxed — no bubble, no avatar. Fennoc is the environment;
  * the user is the guest. Do not symmetrise this with UserBubble below. */
@@ -97,6 +115,10 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   const morningBriefing = useMorningBriefing(today);
   const eveningBriefing = useEveningBriefing(today);
   const captures = useTodayCaptures();
+  // Select the actions individually — a selector returning a fresh object each
+  // read is what caused the "Maximum update depth exceeded" crash earlier.
+  const addCapture = useThreadStore((s) => s.addCapture);
+  const addFennocLine = useThreadStore((s) => s.addFennocLine);
   const pendingQuery = usePendingCheckin();
   const replyMutation = useReplyCheckin();
 
@@ -122,12 +144,18 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
       });
     }
     for (const capture of captures) {
-      list.push({
-        id: capture.id,
-        kind: "user-capture",
-        atMs: new Date(capture.createdAt).getTime(),
-        text: capture.text,
-      });
+      const atMs = new Date(capture.createdAt).getTime();
+      list.push(
+        capture.speaker === "fennoc"
+          ? {
+              id: capture.id,
+              kind: "fennoc-line",
+              atMs,
+              stamp: formatTimeOfDay(capture.createdAt),
+              text: capture.text,
+            }
+          : { id: capture.id, kind: "user-capture", atMs, text: capture.text },
+      );
     }
 
     return list.sort((a, b) => a.atMs - b.atMs);
@@ -143,6 +171,15 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     replyMutation.mutate(
       { text, questionType },
       {
+        onSuccess: (result) => {
+          // Answering used to leave nothing behind: the card unmounted and the
+          // thread was unchanged, which reads as "it ignored me". Echo the
+          // answer, then Fennoc's own ack — the server returns either a
+          // confirmation or a follow-up question depending on whether the
+          // reply actually parsed, so this stays honest when parsing fails.
+          addCapture(text);
+          if (result?.ack) addFennocLine(result.ack);
+        },
         onError: (error) => {
           // Already answered/expired elsewhere — the server's state wins;
           // resync so the card clears instead of surfacing a dead end.
@@ -199,13 +236,17 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         className="flex-1"
         contentContainerClassName="flex-grow justify-end gap-[18px] px-4 py-5"
       >
-        {messages.map((message) =>
-          message.kind === "fennoc-briefing" ? (
-            <FennocMessage key={message.id} label={message.label} stamp={message.stamp} />
-          ) : (
-            <UserBubble key={message.id} text={message.text} />
-          ),
-        )}
+        {messages.map((message) => {
+          if (message.kind === "fennoc-briefing") {
+            return (
+              <FennocMessage key={message.id} label={message.label} stamp={message.stamp} />
+            );
+          }
+          if (message.kind === "fennoc-line") {
+            return <FennocLine key={message.id} stamp={message.stamp} text={message.text} />;
+          }
+          return <UserBubble key={message.id} text={message.text} />;
+        })}
         <ThreadTerminus />
       </ScrollView>
 

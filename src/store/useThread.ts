@@ -23,22 +23,35 @@ export interface ThreadCapture {
   id: string;
   text: string;
   createdAt: string; // ISO 8601
+  /** Who said it. Fennoc speaks unboxed; the user speaks in a bubble. */
+  speaker: "user" | "fennoc";
 }
 
 interface ThreadState {
   captures: ThreadCapture[];
   addCapture: (text: string) => void;
+  /**
+   * Append a line Fennoc said.
+   *
+   * Used for the acknowledgement after a check-in reply. Pass the server's own
+   * `ack` string rather than composing one here — `process_check_in_reply`
+   * returns either a confirmation or a follow-up question depending on whether
+   * the reply actually parsed, so inventing a cheerful "Tracking it." locally
+   * would claim success the server never reported.
+   */
+  addFennocLine: (text: string) => void;
+}
+
+function entry(text: string, speaker: ThreadCapture["speaker"]): ThreadCapture {
+  return { id: Crypto.randomUUID(), text, createdAt: new Date().toISOString(), speaker };
 }
 
 export const useThreadStore = create<ThreadState>()((set) => ({
   captures: [],
   addCapture: (text) =>
-    set((state) => ({
-      captures: [
-        ...state.captures,
-        { id: Crypto.randomUUID(), text, createdAt: new Date().toISOString() },
-      ],
-    })),
+    set((state) => ({ captures: [...state.captures, entry(text, "user")] })),
+  addFennocLine: (text) =>
+    set((state) => ({ captures: [...state.captures, entry(text, "fennoc")] })),
 }));
 
 function isLocalToday(iso: string): boolean {
