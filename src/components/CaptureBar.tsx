@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { Keyboard as KeyboardIcon, Mic } from "lucide-react-native";
+import { ArrowUp, Keyboard as KeyboardIcon, Mic, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -52,12 +52,26 @@ export function CaptureBar() {
   // never allocate.
   const addCapture = useThreadStore((s) => s.addCapture);
   const addAgentPending = useThreadStore((s) => s.addAgentPending);
+  const replyingTo = useThreadStore((s) => s.replyingTo);
+  const setReplyingTo = useThreadStore((s) => s.setReplyingTo);
 
   useEffect(() => {
     return () => {
       if (clearTimer.current) clearTimeout(clearTimer.current);
     };
   }, []);
+
+  // Focus the composer the moment `replyingTo` transitions from null to
+  // non-null (i.e. a Reply CTA was just pressed elsewhere in the tree).
+  // CaptureBar owns its own TextInput ref, so this is the simplest way to
+  // react to that transition without leaking the ref across the tree.
+  const wasReplyingRef = useRef(false);
+  useEffect(() => {
+    if (replyingTo && !wasReplyingRef.current) {
+      inputRef.current?.focus();
+    }
+    wasReplyingRef.current = replyingTo !== null;
+  }, [replyingTo]);
 
   const showFeedback = (kind: Feedback, msg?: string) => {
     if (clearTimer.current) clearTimeout(clearTimer.current);
@@ -92,6 +106,7 @@ export function CaptureBar() {
       {
         onSuccess: (result) => {
           setText("");
+          setReplyingTo(null);
           showFeedback(result.queued ? "queued" : "captured");
         },
         onError: (error) => {
@@ -114,6 +129,12 @@ export function CaptureBar() {
     setFeedback(null);
     setErrorMsg(null);
 
+    // `trimmed` is sent as-is, never prefixed with `replyingTo.quote`. The
+    // app's thread is one continuous Hermes session, so the agent already
+    // has its own question in context — the quote strip above is purely a
+    // user-facing affordance for what "Reply" is answering. Sending the raw
+    // answer also keeps this input identical to what Telegram sends, which
+    // is what the INT-029 acceptance test depends on.
     sendAgentMessage.mutate(trimmed, {
       onSuccess: (result) => {
         // The user's own bubble, then a pending Fennoc entry the
@@ -122,6 +143,7 @@ export function CaptureBar() {
         addCapture(trimmed);
         addAgentPending(result.id);
         setText("");
+        setReplyingTo(null);
       },
       onError: (error) => {
         // A thought must never go missing because the network dropped:
@@ -140,6 +162,7 @@ export function CaptureBar() {
   };
 
   const pending = sendAgentMessage.isPending || captureMutation.isPending;
+  const hasText = text.trim().length > 0;
 
   const onMicPress = () => {
     if (text.trim().length > 0) {
@@ -153,6 +176,39 @@ export function CaptureBar() {
 
   return (
     <View className="gap-[14px] border-t border-line-strong bg-bg-float px-4 py-[14px]">
+      {/* The quoted strip for whatever "Reply" (ThreadScreen / ReplySheet)
+          most recently targeted. UI affordance only — see the comment above
+          sendAgentMessage.mutate in onSubmit for why the quote itself is
+          never sent. Left accent uses the same border-line-strong token as
+          the rest of the border; `signal` (amber) is reserved for an
+          unanswered question / running timer, not this strip.
+
+          Surface is `bg.raised`, NOT `bg.float` — the composer bar this sits
+          inside is already `bg.float`, so a float-on-float strip has zero
+          contrast and reads as a bare outline. Recessed is also the right
+          metaphor for a quote: it belongs beneath what you're writing, not
+          floating above it. */}
+      {replyingTo ? (
+        <View className="flex-row items-start gap-2 rounded-sm border border-line-strong border-l-2 bg-bg-raised px-3 py-2">
+          <View className="flex-1">
+            <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
+              REPLYING TO
+            </Text>
+            <Text className="mt-1 font-sans text-caption text-ink-secondary" numberOfLines={2}>
+              {replyingTo.quote}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Cancel reply"
+            accessibilityRole="button"
+            className="h-touch w-touch items-center justify-center"
+            onPress={() => setReplyingTo(null)}
+          >
+            <X color={palette.ink.muted} size={18} />
+          </Pressable>
+        </View>
+      ) : null}
+
       <View className="flex-row items-center gap-[14px]">
         <Pressable
           accessibilityLabel="Open keyboard"
@@ -178,7 +234,7 @@ export function CaptureBar() {
         />
 
         <Pressable
-          accessibilityLabel="Capture"
+          accessibilityLabel={hasText ? "Send" : "Capture"}
           accessibilityRole="button"
           className="h-mic w-mic items-center justify-center rounded-full bg-ink active:opacity-80"
           disabled={pending}
@@ -186,6 +242,13 @@ export function CaptureBar() {
         >
           {pending ? (
             <ActivityIndicator color={palette.bg.base} />
+          ) : hasText ? (
+            // Reported from a real device: "the microphone icon is throwing
+            // me… maybe it should toggle to a paper plane when I start
+            // typing." onMicPress already sends typed text (see its comment
+            // above) — this just makes that existing behaviour legible.
+            // Same size/shape/fill as the mic; only the glyph changes.
+            <ArrowUp color={palette.bg.base} size={28} />
           ) : (
             <Mic color={palette.bg.base} size={28} />
           )}

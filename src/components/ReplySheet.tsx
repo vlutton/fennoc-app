@@ -19,6 +19,14 @@ interface ReplySheetProps {
   visible: boolean;
   onClose: () => void;
   body: string | null;
+  /** The message this sheet is showing the rest of — needed so the Reply
+   *  button below has something to hand off to `onReply`. */
+  messageId: string | null;
+  /** The full reply text (lede + body), passed straight through as the
+   *  composer's quote. See CaptureBar's note on why the quote itself is
+   *  never re-sent to the server. */
+  quote: string;
+  onReply: (messageId: string, quote: string) => void;
 }
 
 // The sheet caps at 80% of the window, like a summoned widget sheet
@@ -46,7 +54,14 @@ const MAX_HEIGHT_RATIO = 0.8;
  *    not size a `flex-1` child. The scroll container below gets a real,
  *    computed `height`, not a bare `maxHeight`.
  */
-export function ReplySheet({ visible, onClose, body }: ReplySheetProps) {
+export function ReplySheet({
+  visible,
+  onClose,
+  body,
+  messageId,
+  quote,
+  onReply,
+}: ReplySheetProps) {
   return (
     <Modal
       animationType="slide"
@@ -55,7 +70,13 @@ export function ReplySheet({ visible, onClose, body }: ReplySheetProps) {
       visible={visible}
     >
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <ReplySheetContent body={body} onClose={onClose} />
+        <ReplySheetContent
+          body={body}
+          messageId={messageId}
+          onClose={onClose}
+          onReply={onReply}
+          quote={quote}
+        />
       </SafeAreaProvider>
     </Modal>
   );
@@ -64,9 +85,15 @@ export function ReplySheet({ visible, onClose, body }: ReplySheetProps) {
 function ReplySheetContent({
   body,
   onClose,
+  messageId,
+  quote,
+  onReply,
 }: {
   body: string | null;
   onClose: () => void;
+  messageId: string | null;
+  quote: string;
+  onReply: (messageId: string, quote: string) => void;
 }) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
@@ -104,6 +131,24 @@ function ReplySheetContent({
             onPress={onClose}
           >
             <X color={palette.ink.DEFAULT} size={22} />
+          </Pressable>
+        </View>
+
+        {/* Unlike the inline CTA in ThreadScreen (only shown when the reply
+            looks like a question), this sheet always offers Reply — the user
+            already explicitly opened it to read more, so the affordance is
+            never noise here. Styled identically to "Read the rest" /
+            "Read briefing" elsewhere. */}
+        <View className="px-4 pb-3">
+          <Pressable
+            accessibilityLabel="Reply"
+            accessibilityRole="button"
+            className="h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
+            onPress={() => {
+              if (messageId) onReply(messageId, quote);
+            }}
+          >
+            <Text className="font-sans-medium text-label text-ink">Reply</Text>
           </Pressable>
         </View>
 

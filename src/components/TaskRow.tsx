@@ -1,4 +1,5 @@
 import { Check, Trash2 } from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { Task } from "../api/types";
@@ -46,6 +47,18 @@ export function TaskRow({ task, onComplete, onDrop, busy = false, held = false }
   const state: RowState = held ? "held" : task.status === "completed" ? "done" : "open";
   const checkboxInteractive = state === "open" && !busy;
 
+  // Reported from a real device: "most of the todos are highly truncated, but
+  // there is no way for me to click to see the full content — I can't check off
+  // an unknown task." The title was clamped to ONE line, which breaks the row's
+  // whole job: the title IS the task's identity, and you cannot decide to
+  // complete something you can't read.
+  //
+  // Two changes, deliberately both: the resting clamp goes to 3 lines (which
+  // makes almost every real title fully readable without any interaction), and
+  // tapping the text column reveals the rest. The tap is what the operator
+  // actually asked for; the 3-line default is so they rarely need it.
+  const [expanded, setExpanded] = useState(false);
+
   // mb-3: list spacing, not part of the component spec itself — callers
   // that lay these out with their own gap (a future ledger list) can
   // override/ignore it; TaskListScreen relies on it today.
@@ -76,21 +89,27 @@ export function TaskRow({ task, onComplete, onDrop, busy = false, held = false }
         </View>
       </Pressable>
 
-      <View className="flex-1">
+      <Pressable
+        accessibilityHint={expanded ? "Tap to collapse the title" : "Tap to show the full title"}
+        accessibilityLabel={task.title}
+        accessibilityRole="button"
+        className="flex-1 py-1"
+        onPress={() => setExpanded((value) => !value)}
+      >
         <Text
           className={
             state === "done"
               ? "font-sans text-body text-ink-muted line-through"
               : "font-sans text-body text-ink"
           }
-          numberOfLines={1}
+          numberOfLines={expanded ? undefined : 3}
         >
           {task.title}
         </Text>
         <Text className="mt-1 font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
           {metaLine(task, state)}
         </Text>
-      </View>
+      </Pressable>
 
       {state === "open" ? (
         <Pressable

@@ -1,5 +1,5 @@
 import { isAxiosError } from "axios";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -179,6 +179,27 @@ function AgentTurnWatcher({ messageId }: { messageId: string }) {
   return null;
 }
 
+/**
+ * What the composer's "REPLYING TO" strip should show for a given reply.
+ *
+ * Not the lede. When Fennoc asks something, the question is usually the LAST
+ * thing it says — often buried at the end of a collapsed body — and the lede
+ * is a heading like "Full plate. Tue Jul 28.", which tells you nothing about
+ * what you're answering. So: quote the final question if there is one, and
+ * fall back to the opening line only when there isn't.
+ *
+ * Whitespace is collapsed because the raw reply is `lede\n\nbody`, and a
+ * two-line clamp spends one of its lines on the blank.
+ */
+function quoteFor(fullText: string): string {
+  const flat = fullText.replace(/\s+/g, " ").trim();
+  const questions = flat.match(/[^.!?]*\?/g);
+  if (questions && questions.length > 0) {
+    return questions[questions.length - 1].trim();
+  }
+  return flat;
+}
+
 function ThreadTerminus() {
   return (
     <View className="flex-row items-center gap-3">
@@ -214,6 +235,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   // read is what caused the "Maximum update depth exceeded" crash earlier.
   const addCapture = useThreadStore((s) => s.addCapture);
   const addFennocLine = useThreadStore((s) => s.addFennocLine);
+  const setReplyingTo = useThreadStore((s) => s.setReplyingTo);
   const pendingQuery = usePendingCheckin();
   const replyMutation = useReplyCheckin();
 
@@ -283,10 +305,42 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     [captures],
   );
 
-  const [openReplyBody, setOpenReplyBody] = useState<string | null>(null);
+  // Holds the message the "Read the rest" sheet is currently showing — its
+  // body (the sheet's content), and its messageId/quote (so the sheet's own
+  // always-visible Reply button, see ReplySheet, has something to hand off
+  // to onReply below).
+  const [openReplyMessage, setOpenReplyMessage] = useState<{
+    messageId: string;
+    body: string;
+    quote: string;
+  } | null>(null);
+
+  const scrollRef = useRef<ScrollView>(null);
 
   const onOpenLedger = () => {
     setLedgerOpen(true);
+  };
+
+  // Fix for a reported bug: "after the thinking went away it had responded
+  // but it was below the text box so I couldn't see it and didn't realize
+  // it." The ScrollView never auto-scrolled, so a reply landing below the
+  // fold was invisible and read as "it didn't answer". onContentSizeChange
+  // fires whenever the content height changes — which covers all three
+  // cases that matter here: the user's own bubble appearing, the
+  // "Thinking…" entry appearing, and that entry resolving into a reply
+  // (a further height change). Do not simplify this away.
+  const onThreadContentSizeChange = () => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  };
+
+  // Shared by both Reply entry points (the inline CTA on an agent reply in
+  // the thread, and ReplySheet's always-visible Reply button): close the
+  // sheet if it's open (a no-op if it wasn't) and hand the message off to
+  // the composer via the store. CaptureBar focuses itself once
+  // `replyingTo` goes from null to non-null — see its own effect.
+  const onReply = (messageId: string, quote: string) => {
+    setOpenReplyMessage(null);
+    setReplyingTo({ messageId, quote });
   };
 
   const onCheckinReply = (text: string) => {
@@ -359,6 +413,8 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
       <ScrollView
         className="flex-1"
         contentContainerClassName="flex-grow justify-end gap-[18px] px-4 py-5"
+        onContentSizeChange={onThreadContentSizeChange}
+        ref={scrollRef}
       >
         {messages.map((message) => {
           if (message.kind === "fennoc-briefing") {
@@ -382,18 +438,53 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
                 />
               );
             }
+            // The full reply — lede plus the collapsed body, when there is
+            // one — is what both the "does this need a Reply CTA" heuristic
+            // and the composer's quoted strip work from, so a question
+            // buried in the collapsed part still surfaces the button.
+            const fullReplyText = message.body
+              ? `${message.text}\n\n${message.body}`
+              : message.text;
+            // Heuristic, not a real question-detector: a "?" anywhere in the
+            // reply. Cheap and honest for the reported case (a question with
+            // no way to answer); a boxed "Reply" under every Fennoc line
+            // would be noise Fennoc's unboxed voice doesn't want. Revisit if
+            // this proves too broad or too narrow in practice.
+            const hasQuestion = fullReplyText.includes("?");
+            // See quoteFor: the strip shows the QUESTION, not the lede.
+            const replyQuote = quoteFor(fullReplyText);
             return (
               <View key={message.id}>
                 <FennocLine stamp={message.stamp} text={message.text} />
-                {message.body !== null ? (
-                  <Pressable
-                    accessibilityLabel="Read the rest"
-                    accessibilityRole="button"
-                    className="mt-2 h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
-                    onPress={() => setOpenReplyBody(message.body)}
-                  >
-                    <Text className="font-sans-medium text-label text-ink">Read the rest</Text>
-                  </Pressable>
+                {message.body !== null || hasQuestion ? (
+                  <View className="mt-2 flex-row items-center gap-2">
+                    {message.body !== null ? (
+                      <Pressable
+                        accessibilityLabel="Read the rest"
+                        accessibilityRole="button"
+                        className="h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
+                        onPress={() =>
+                          setOpenReplyMessage({
+                            messageId: message.messageId,
+                            body: message.body as string,
+                            quote: replyQuote,
+                          })
+                        }
+                      >
+                        <Text className="font-sans-medium text-label text-ink">Read the rest</Text>
+                      </Pressable>
+                    ) : null}
+                    {hasQuestion ? (
+                      <Pressable
+                        accessibilityLabel="Reply"
+                        accessibilityRole="button"
+                        className="h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
+                        onPress={() => onReply(message.messageId, replyQuote)}
+                      >
+                        <Text className="font-sans-medium text-label text-ink">Reply</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
             );
@@ -435,9 +526,12 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
 
       <LedgerSheet onClose={() => setLedgerOpen(false)} visible={ledgerOpen} />
       <ReplySheet
-        body={openReplyBody}
-        onClose={() => setOpenReplyBody(null)}
-        visible={openReplyBody !== null}
+        body={openReplyMessage?.body ?? null}
+        messageId={openReplyMessage?.messageId ?? null}
+        onClose={() => setOpenReplyMessage(null)}
+        onReply={onReply}
+        quote={openReplyMessage?.quote ?? ""}
+        visible={openReplyMessage !== null}
       />
     </SafeAreaView>
   );

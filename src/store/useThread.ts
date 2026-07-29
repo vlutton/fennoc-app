@@ -71,6 +71,10 @@ interface ThreadState {
     messageId: string,
     result: { text: string; body: string | null; state: "done" | "error" },
   ) => void;
+  /** What the composer is currently answering, for the quoted strip above it.
+   *  UI state only — see the note in CaptureBar on why the quote is not sent. */
+  replyingTo: { messageId: string; quote: string } | null;
+  setReplyingTo: (value: { messageId: string; quote: string } | null) => void;
 }
 
 function entry(text: string, speaker: ThreadCapture["speaker"]): ThreadCapture {
@@ -105,6 +109,8 @@ export const useThreadStore = create<ThreadState>()((set) => ({
           : c,
       ),
     })),
+  replyingTo: null,
+  setReplyingTo: (value) => set({ replyingTo: value }),
 }));
 
 function isLocalToday(iso: string): boolean {
