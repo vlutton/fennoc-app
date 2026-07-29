@@ -41,6 +41,7 @@ export function NextStrip() {
   const startTimeMutation = useStartTime();
   const todayTasksQuery = useTodayTasks();
 
+  const [expanded, setExpanded] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const timer = openTimerQuery.data;
   const running = timer?.active === true;
@@ -91,27 +92,52 @@ export function NextStrip() {
   }
 
   const nextTask = todayTasksQuery.data?.[0];
+  const remaining = Math.max(0, (todayTasksQuery.data?.length ?? 0) - 1);
 
   if (nextTask) {
     return (
       <View className={`${ROW_CLASS} border border-line-hairline bg-bg-raised`}>
         <NextLabel />
-        <View className="flex-1">
-          {/* Two lines, not one. Reported from a real device: the strip read
-              "CA Trip: Set Thu 7/30 rever…" and the operator could not tell
-              what it was referring to. Same defect as the ledger rows — a
-              title you can't read can't be acted on. */}
-          <Text className="font-sans text-body text-ink" numberOfLines={2}>
+        {/*
+          Two rounds of feedback landed here. First the title was clamped to
+          ONE line ("CA Trip: Set Thu 7/30 rever…"); two lines was still not
+          enough — "I am still not sure what it was asking me to start
+          tracking, something about Avis and california return trip."
+
+          The real problem is that agent-authored task titles are long
+          compound sentences, and no fixed clamp makes those readable. So the
+          clamp goes to three lines AND the whole block is tappable to show
+          the rest, exactly as the ledger rows now work. Consistency matters
+          here: the same gesture should reveal the same thing everywhere.
+        */}
+        <Pressable
+          accessibilityHint={expanded ? "Tap to collapse" : "Tap to show the full task"}
+          accessibilityLabel={nextTask.title}
+          accessibilityRole="button"
+          className="flex-1 py-1"
+          onPress={() => setExpanded((value) => !value)}
+        >
+          <Text className="font-sans text-body text-ink" numberOfLines={expanded ? undefined : 3}>
             {nextTask.title}
           </Text>
+          {/*
+            The sub line carries SEQUENCING, not just metadata. The design's
+            rationale for this whole component is that "the ordering of the
+            day" was the single most useful thing the assistant produced and
+            it was buried in a paragraph — so the strip's job is to say what
+            is next and what follows it, which is what the spec's worked
+            example ("RUNNING · THEN 3 CALLS") shows. A bare "HOME · DUE
+            TODAY" is metadata about one row; it isn't a sequence.
+          */}
           <Text
             className="font-mono-medium text-dataSm text-ink-muted"
             numberOfLines={1}
           >
             {(nextTask.project || "TASK").toUpperCase()}
             {nextTask.due_date ? " · DUE TODAY" : ""}
+            {remaining > 0 ? ` · THEN ${remaining} MORE` : ""}
           </Text>
-        </View>
+        </Pressable>
         {/*
           Labelled "Start timer", not "Start". Reported: "there's a Start
           button, I'm not sure what action I'm supposed to take or what Start
