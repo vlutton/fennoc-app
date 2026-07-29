@@ -317,6 +317,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Agent Message Endpoint */
+        post: operations["create_agent_message_endpoint_api_message_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/message/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Message Endpoint */
+        get: operations["get_agent_message_endpoint_api_message__message_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agent Messages Endpoint */
+        get: operations["list_agent_messages_endpoint_api_messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -338,6 +389,64 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AgentMessageCreatedResponse
+         * @description POST /api/message — 202 Accepted; the row has just been created.
+         */
+        AgentMessageCreatedResponse: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+        };
+        /** AgentMessageRequest */
+        AgentMessageRequest: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * AgentMessageResponse
+         * @description GET /api/message/{id} and /api/messages — full ``agent_messages`` row.
+         *
+         *     Deliberately NOT built with ``response_model_exclude_none``: ``reply``
+         *     and ``error`` are mutually-exclusive-ish but both always present as keys
+         *     (``null`` when not applicable) so the client can rely on a stable shape
+         *     rather than checking for key existence. An asymmetric response shape
+         *     from an optional branch has already caused one real bug in this file
+         *     (see ``PendingCheckinResponse``) — not repeating that here.
+         */
+        AgentMessageResponse: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Text */
+            text: string;
+            /** Reply */
+            reply: string | null;
+            /** Reply Lede */
+            reply_lede: string | null;
+            /** Reply Body */
+            reply_body: string | null;
+            /** Error */
+            error: string | null;
+            /** Complexity */
+            complexity: string | null;
+            /** Model */
+            model: string | null;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Voice Violations */
+            voice_violations: {
+                [key: string]: unknown;
+            }[] | null;
+        };
         /**
          * BriefingResponse
          * @description Shadow-briefing file read; both fields are None together when missing.
@@ -1305,6 +1414,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PushRegisterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_message_endpoint_api_message_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMessageCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_message_endpoint_api_message__message_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_messages_endpoint_api_messages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMessageResponse"][];
                 };
             };
             /** @description Validation Error */

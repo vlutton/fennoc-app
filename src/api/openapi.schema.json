@@ -1,1 +1,2418 @@
-{"openapi":"3.1.0","info":{"title":"fennoc-api","description":"Fennoc REST API — wraps fennoc.* library for mobile and external access.","version":"0.1.0"},"paths":{"/api/tasks":{"get":{"summary":"List Tasks Endpoint","operationId":"list_tasks_endpoint_api_tasks_get","parameters":[{"name":"status","in":"query","required":false,"schema":{"type":"string","default":"open","title":"Status"}},{"name":"project","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Project"}},{"name":"priority","in":"query","required":false,"schema":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Priority"}},{"name":"due_before","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Due Before"}},{"name":"due_after","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Due After"}},{"name":"source","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Source"}},{"name":"domain","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Domain"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","default":200,"title":"Limit"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/TaskResponse"},"title":"Response List Tasks Endpoint Api Tasks Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"post":{"summary":"Create Task Endpoint","operationId":"create_task_endpoint_api_tasks_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateTaskRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateTaskResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/tasks/{task_id}/complete":{"post":{"summary":"Complete Task Endpoint","operationId":"complete_task_endpoint_api_tasks__task_id__complete_post","parameters":[{"name":"task_id","in":"path","required":true,"schema":{"type":"string","title":"Task Id"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OkResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/tasks/{task_id}/drop":{"post":{"summary":"Drop Task Endpoint","operationId":"drop_task_endpoint_api_tasks__task_id__drop_post","parameters":[{"name":"task_id","in":"path","required":true,"schema":{"type":"string","title":"Task Id"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OkResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/tasks/today":{"get":{"summary":"Today Tasks Endpoint","operationId":"today_tasks_endpoint_api_tasks_today_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/TaskResponse"},"title":"Response Today Tasks Endpoint Api Tasks Today Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/tasks/overdue":{"get":{"summary":"Overdue Tasks Endpoint","operationId":"overdue_tasks_endpoint_api_tasks_overdue_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/TaskResponse"},"title":"Response Overdue Tasks Endpoint Api Tasks Overdue Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/time/blocks":{"get":{"summary":"Time Blocks Endpoint","operationId":"time_blocks_endpoint_api_time_blocks_get","parameters":[{"name":"day","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Day"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/TimeBlockResponse"},"title":"Response Time Blocks Endpoint Api Time Blocks Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/time/start":{"post":{"summary":"Time Start Endpoint","operationId":"time_start_endpoint_api_time_start_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/TimeStartRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TimeActionResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/time/stop":{"post":{"summary":"Time Stop Endpoint","operationId":"time_stop_endpoint_api_time_stop_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TimeActionResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/time/current":{"get":{"summary":"Time Current Endpoint","operationId":"time_current_endpoint_api_time_current_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CurrentActivityResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/time/open":{"get":{"summary":"Time Open Endpoint","operationId":"time_open_endpoint_api_time_open_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OpenTimerResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/checkin/pending":{"get":{"summary":"Checkin Pending Endpoint","operationId":"checkin_pending_endpoint_api_checkin_pending_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PendingCheckinResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/checkin/reply":{"post":{"summary":"Checkin Reply Endpoint","operationId":"checkin_reply_endpoint_api_checkin_reply_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CheckinReplyRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CheckinReplyResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/checkin/coverage":{"get":{"summary":"Checkin Coverage Endpoint","operationId":"checkin_coverage_endpoint_api_checkin_coverage_get","parameters":[{"name":"day","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Day"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CheckinCoverageResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/capture":{"post":{"summary":"Capture Endpoint","operationId":"capture_endpoint_api_capture_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CaptureRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CaptureResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/briefing/morning":{"get":{"summary":"Briefing Morning Endpoint","operationId":"briefing_morning_endpoint_api_briefing_morning_get","parameters":[{"name":"day","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Day"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/BriefingResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/briefing/evening":{"get":{"summary":"Briefing Evening Endpoint","operationId":"briefing_evening_endpoint_api_briefing_evening_get","parameters":[{"name":"day","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Day"}},{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/BriefingResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/budget":{"get":{"summary":"Budget Status Endpoint","operationId":"budget_status_endpoint_api_budget_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/BudgetResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"patch":{"summary":"Budget Set Endpoint","operationId":"budget_set_endpoint_api_budget_patch","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/SetBudgetRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/BudgetResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/push/register":{"post":{"summary":"Push Register Endpoint","description":"Register (or refresh) a device token for the not-yet-built push transport.\n\nThis endpoint only persists the token; it does not send anything.","operationId":"push_register_endpoint_api_push_register_post","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PushRegisterRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PushRegisterResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/status":{"get":{"summary":"Status Endpoint","operationId":"status_endpoint_api_status_get","parameters":[{"name":"authorization","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/StatusResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}}},"components":{"schemas":{"BriefingResponse":{"properties":{"text":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Text"},"date":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Date"}},"type":"object","required":["text","date"],"title":"BriefingResponse","description":"Shadow-briefing file read; both fields are None together when missing."},"BudgetResponse":{"properties":{"limit":{"type":"integer","title":"Limit"},"spent":{"type":"integer","title":"Spent"},"remaining":{"type":"integer","title":"Remaining"},"deferred":{"type":"integer","title":"Deferred"},"quiet_hours":{"type":"boolean","title":"Quiet Hours"},"reset_at":{"type":"string","title":"Reset At"}},"type":"object","required":["limit","spent","remaining","deferred","quiet_hours","reset_at"],"title":"BudgetResponse","description":"Mirrors ``fennoc.budget.get_budget_status``."},"CaptureRequest":{"properties":{"text":{"type":"string","title":"Text"},"source_ref":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Source Ref"},"idempotency_key":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Idempotency Key"}},"type":"object","required":["text"],"title":"CaptureRequest"},"CaptureResponse":{"properties":{"ok":{"type":"boolean","title":"Ok"},"event_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Event Id"}},"type":"object","required":["ok","event_id"],"title":"CaptureResponse","description":"``append_capture`` returns ``None`` for ``event_id`` on idempotent dup."},"CheckinCoverageResponse":{"properties":{"answered":{"type":"integer","title":"Answered"},"total":{"type":"integer","title":"Total"}},"type":"object","required":["answered","total"],"title":"CheckinCoverageResponse"},"CheckinReplyRequest":{"properties":{"text":{"type":"string","title":"Text"},"question_type":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Question Type"}},"type":"object","required":["text"],"title":"CheckinReplyRequest"},"CheckinReplyResponse":{"properties":{"ok":{"type":"boolean","title":"Ok"},"ack":{"type":"string","title":"Ack"}},"type":"object","required":["ok","ack"],"title":"CheckinReplyResponse"},"CreateTaskRequest":{"properties":{"title":{"type":"string","title":"Title"},"project":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Project"},"priority":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Priority"},"due_date":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Due Date"},"labels":{"anyOf":[{"items":{"type":"string"},"type":"array"},{"type":"null"}],"title":"Labels"}},"type":"object","required":["title"],"title":"CreateTaskRequest"},"CreateTaskResponse":{"properties":{"task_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Task Id"},"title":{"type":"string","title":"Title"}},"type":"object","required":["task_id","title"],"title":"CreateTaskResponse","description":"``create_task`` returns ``None`` for ``task_id`` on idempotency-key duplicate."},"CurrentActivityResponse":{"properties":{"active":{"type":"boolean","title":"Active"},"category":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Category"},"label":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Label"},"started_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Started At"}},"type":"object","required":["active"],"title":"CurrentActivityResponse","description":"GET /api/time/current — cursor-backed, set only by fennoc.checkins.\n\nDiscriminated on ``active``; when True the writer (``_set_current_activity``)\nalways sets all three optional fields together, but they're modelled as\noptional since the cursor is free-form JSON. Route uses\nresponse_model_exclude_none so the ``active: False`` branch stays the\noriginal bare ``{\"active\": false}`` shape."},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"OkResponse":{"properties":{"ok":{"type":"boolean","title":"Ok"}},"type":"object","required":["ok"],"title":"OkResponse","description":"Shared shape for the task complete/drop endpoints: ``{\"ok\": bool}``."},"OpenTimerResponse":{"properties":{"active":{"type":"boolean","title":"Active"},"started_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Started At"},"label":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Label"},"category":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Category"}},"type":"object","required":["active"],"title":"OpenTimerResponse","description":"GET /api/time/open — the manual start/stop timer cursor.\n\nSame discriminant pattern as CurrentActivityResponse; kept as a\nseparate model because it's a semantically distinct cursor\n(``time_open_block`` vs ``current_activity``), matching the client's\nseparate ``OpenTimer`` / ``CheckinCurrent`` types."},"PendingCheckinResponse":{"properties":{"pending":{"type":"boolean","title":"Pending"},"id":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Id"},"sent_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Sent At"},"question_type":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Question Type"},"question_text":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Question Text"}},"type":"object","required":["pending"],"title":"PendingCheckinResponse","description":"GET /api/checkin/pending — both branches always carry ``pending``.\n\nThis is the model for the bug this pass exists to prevent: the endpoint\nused to omit ``pending`` on the populated branch entirely. Route uses\nresponse_model_exclude_none so the empty branch stays the original bare\n``{\"pending\": false}`` shape."},"PushRegisterRequest":{"properties":{"token":{"type":"string","title":"Token"},"platform":{"type":"string","title":"Platform"},"user":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"User"}},"type":"object","required":["token","platform"],"title":"PushRegisterRequest"},"PushRegisterResponse":{"properties":{"ok":{"type":"boolean","title":"Ok"},"token":{"type":"string","title":"Token"},"platform":{"type":"string","title":"Platform"},"user":{"type":"string","title":"User"},"last_seen_at":{"type":"string","title":"Last Seen At"}},"type":"object","required":["ok","token","platform","user","last_seen_at"],"title":"PushRegisterResponse","description":"Mirrors the ``DeviceToken`` fields echoed back by ``register_device_token``."},"SetBudgetRequest":{"properties":{"limit":{"type":"integer","title":"Limit"}},"type":"object","required":["limit"],"title":"SetBudgetRequest"},"StatusResponse":{"properties":{"open":{"type":"integer","title":"Open"},"completed":{"type":"integer","title":"Completed"},"overdue":{"type":"integer","title":"Overdue"},"checkin_coverage":{"$ref":"#/components/schemas/CheckinCoverageResponse"}},"type":"object","required":["open","completed","overdue","checkin_coverage"],"title":"StatusResponse","description":"Mirrors the aggregate dict built by ``status_endpoint``."},"TaskResponse":{"properties":{"task_id":{"type":"string","title":"Task Id"},"title":{"type":"string","title":"Title"},"project":{"type":"string","title":"Project"},"priority":{"type":"integer","title":"Priority"},"due_date":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Due Date"},"labels":{"items":{"type":"string"},"type":"array","title":"Labels"},"status":{"type":"string","title":"Status"},"source":{"type":"string","title":"Source"},"source_ref":{"type":"string","title":"Source Ref"},"recurrence":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Recurrence"},"recurrence_parent_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Recurrence Parent Id"},"created_at":{"type":"string","title":"Created At"},"completed_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Completed At"},"updated_at":{"type":"string","title":"Updated At"},"metadata":{"additionalProperties":true,"type":"object","title":"Metadata"}},"type":"object","required":["task_id","title","project","priority","due_date","labels","status","source","source_ref","recurrence","recurrence_parent_id","created_at","completed_at","updated_at","metadata"],"title":"TaskResponse","description":"Mirrors ``fennoc.store.accessors.Task`` (table `tasks`, migration 006/007)."},"TimeActionResponse":{"properties":{"ok":{"type":"boolean","title":"Ok"},"message":{"type":"string","title":"Message"}},"type":"object","required":["ok","message"],"title":"TimeActionResponse","description":"Shared shape for /api/time/start and /api/time/stop."},"TimeBlockResponse":{"properties":{"block_id":{"type":"string","title":"Block Id"},"started_at":{"type":"string","title":"Started At"},"ended_at":{"type":"string","title":"Ended At"},"duration_s":{"type":"integer","title":"Duration S"},"source":{"type":"string","title":"Source"},"category":{"type":"string","title":"Category"},"label":{"type":"string","title":"Label"},"confidence":{"type":"string","title":"Confidence"},"idempotency_key":{"type":"string","title":"Idempotency Key"},"metadata":{"type":"string","title":"Metadata"},"created_at":{"type":"string","title":"Created At"}},"type":"object","required":["block_id","started_at","ended_at","duration_s","source","category","label","confidence","idempotency_key","metadata","created_at"],"title":"TimeBlockResponse","description":"Mirrors ``fennoc.store.accessors.TimeBlock`` (table `time_blocks`, migration 005).\n\n``metadata`` is a JSON string on the wire, not an object — matches the\ndataclass field and the pre-existing warning in the client's types.ts."},"TimeStartRequest":{"properties":{"category":{"type":"string","title":"Category"},"label":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Label"}},"type":"object","required":["category"],"title":"TimeStartRequest"},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"},"input":{"title":"Input"},"ctx":{"type":"object","title":"Context"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"}}}}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "fennoc-api",
+    "description": "Fennoc REST API \u2014 wraps fennoc.* library for mobile and external access.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/tasks": {
+      "get": {
+        "summary": "List Tasks Endpoint",
+        "operationId": "list_tasks_endpoint_api_tasks_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "open",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "due_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due Before"
+            }
+          },
+          {
+            "name": "due_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due After"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  },
+                  "title": "Response List Tasks Endpoint Api Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Task Endpoint",
+        "operationId": "create_task_endpoint_api_tasks_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/complete": {
+      "post": {
+        "summary": "Complete Task Endpoint",
+        "operationId": "complete_task_endpoint_api_tasks__task_id__complete_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/drop": {
+      "post": {
+        "summary": "Drop Task Endpoint",
+        "operationId": "drop_task_endpoint_api_tasks__task_id__drop_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/today": {
+      "get": {
+        "summary": "Today Tasks Endpoint",
+        "operationId": "today_tasks_endpoint_api_tasks_today_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  },
+                  "title": "Response Today Tasks Endpoint Api Tasks Today Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/overdue": {
+      "get": {
+        "summary": "Overdue Tasks Endpoint",
+        "operationId": "overdue_tasks_endpoint_api_tasks_overdue_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  },
+                  "title": "Response Overdue Tasks Endpoint Api Tasks Overdue Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/time/blocks": {
+      "get": {
+        "summary": "Time Blocks Endpoint",
+        "operationId": "time_blocks_endpoint_api_time_blocks_get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimeBlockResponse"
+                  },
+                  "title": "Response Time Blocks Endpoint Api Time Blocks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/time/start": {
+      "post": {
+        "summary": "Time Start Endpoint",
+        "operationId": "time_start_endpoint_api_time_start_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/time/stop": {
+      "post": {
+        "summary": "Time Stop Endpoint",
+        "operationId": "time_stop_endpoint_api_time_stop_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/time/current": {
+      "get": {
+        "summary": "Time Current Endpoint",
+        "operationId": "time_current_endpoint_api_time_current_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentActivityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/time/open": {
+      "get": {
+        "summary": "Time Open Endpoint",
+        "operationId": "time_open_endpoint_api_time_open_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenTimerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/checkin/pending": {
+      "get": {
+        "summary": "Checkin Pending Endpoint",
+        "operationId": "checkin_pending_endpoint_api_checkin_pending_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingCheckinResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/checkin/reply": {
+      "post": {
+        "summary": "Checkin Reply Endpoint",
+        "operationId": "checkin_reply_endpoint_api_checkin_reply_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckinReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckinReplyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/checkin/coverage": {
+      "get": {
+        "summary": "Checkin Coverage Endpoint",
+        "operationId": "checkin_coverage_endpoint_api_checkin_coverage_get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckinCoverageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capture": {
+      "post": {
+        "summary": "Capture Endpoint",
+        "operationId": "capture_endpoint_api_capture_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/briefing/morning": {
+      "get": {
+        "summary": "Briefing Morning Endpoint",
+        "operationId": "briefing_morning_endpoint_api_briefing_morning_get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/briefing/evening": {
+      "get": {
+        "summary": "Briefing Evening Endpoint",
+        "operationId": "briefing_evening_endpoint_api_briefing_evening_get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budget": {
+      "get": {
+        "summary": "Budget Status Endpoint",
+        "operationId": "budget_status_endpoint_api_budget_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Budget Set Endpoint",
+        "operationId": "budget_set_endpoint_api_budget_patch",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBudgetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/register": {
+      "post": {
+        "summary": "Push Register Endpoint",
+        "description": "Register (or refresh) a device token for the not-yet-built push transport.\n\nThis endpoint only persists the token; it does not send anything.",
+        "operationId": "push_register_endpoint_api_push_register_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushRegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushRegisterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/message": {
+      "post": {
+        "summary": "Create Agent Message Endpoint",
+        "operationId": "create_agent_message_endpoint_api_message_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMessageCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/message/{message_id}": {
+      "get": {
+        "summary": "Get Agent Message Endpoint",
+        "operationId": "get_agent_message_endpoint_api_message__message_id__get",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages": {
+      "get": {
+        "summary": "List Agent Messages Endpoint",
+        "operationId": "list_agent_messages_endpoint_api_messages_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentMessageResponse"
+                  },
+                  "title": "Response List Agent Messages Endpoint Api Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "Status Endpoint",
+        "operationId": "status_endpoint_api_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentMessageCreatedResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "AgentMessageCreatedResponse",
+        "description": "POST /api/message \u2014 202 Accepted; the row has just been created."
+      },
+      "AgentMessageRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "AgentMessageRequest"
+      },
+      "AgentMessageResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply"
+          },
+          "reply_lede": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Lede"
+          },
+          "reply_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Body"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "complexity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complexity"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "voice_violations": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Violations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "text",
+          "reply",
+          "reply_lede",
+          "reply_body",
+          "error",
+          "complexity",
+          "model",
+          "created_at",
+          "updated_at",
+          "duration_ms",
+          "voice_violations"
+        ],
+        "title": "AgentMessageResponse",
+        "description": "GET /api/message/{id} and /api/messages \u2014 full ``agent_messages`` row.\n\nDeliberately NOT built with ``response_model_exclude_none``: ``reply``\nand ``error`` are mutually-exclusive-ish but both always present as keys\n(``null`` when not applicable) so the client can rely on a stable shape\nrather than checking for key existence. An asymmetric response shape\nfrom an optional branch has already caused one real bug in this file\n(see ``PendingCheckinResponse``) \u2014 not repeating that here."
+      },
+      "BriefingResponse": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "date"
+        ],
+        "title": "BriefingResponse",
+        "description": "Shadow-briefing file read; both fields are None together when missing."
+      },
+      "BudgetResponse": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "spent": {
+            "type": "integer",
+            "title": "Spent"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          },
+          "deferred": {
+            "type": "integer",
+            "title": "Deferred"
+          },
+          "quiet_hours": {
+            "type": "boolean",
+            "title": "Quiet Hours"
+          },
+          "reset_at": {
+            "type": "string",
+            "title": "Reset At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "spent",
+          "remaining",
+          "deferred",
+          "quiet_hours",
+          "reset_at"
+        ],
+        "title": "BudgetResponse",
+        "description": "Mirrors ``fennoc.budget.get_budget_status``."
+      },
+      "CaptureRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "CaptureRequest"
+      },
+      "CaptureResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "event_id"
+        ],
+        "title": "CaptureResponse",
+        "description": "``append_capture`` returns ``None`` for ``event_id`` on idempotent dup."
+      },
+      "CheckinCoverageResponse": {
+        "properties": {
+          "answered": {
+            "type": "integer",
+            "title": "Answered"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answered",
+          "total"
+        ],
+        "title": "CheckinCoverageResponse"
+      },
+      "CheckinReplyRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "question_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "CheckinReplyRequest"
+      },
+      "CheckinReplyResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "ack": {
+            "type": "string",
+            "title": "Ack"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "ack"
+        ],
+        "title": "CheckinReplyResponse"
+      },
+      "CreateTaskRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "CreateTaskRequest"
+      },
+      "CreateTaskResponse": {
+        "properties": {
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title"
+        ],
+        "title": "CreateTaskResponse",
+        "description": "``create_task`` returns ``None`` for ``task_id`` on idempotency-key duplicate."
+      },
+      "CurrentActivityResponse": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active"
+        ],
+        "title": "CurrentActivityResponse",
+        "description": "GET /api/time/current \u2014 cursor-backed, set only by fennoc.checkins.\n\nDiscriminated on ``active``; when True the writer (``_set_current_activity``)\nalways sets all three optional fields together, but they're modelled as\noptional since the cursor is free-form JSON. Route uses\nresponse_model_exclude_none so the ``active: False`` branch stays the\noriginal bare ``{\"active\": false}`` shape."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OkResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "OkResponse",
+        "description": "Shared shape for the task complete/drop endpoints: ``{\"ok\": bool}``."
+      },
+      "OpenTimerResponse": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active"
+        ],
+        "title": "OpenTimerResponse",
+        "description": "GET /api/time/open \u2014 the manual start/stop timer cursor.\n\nSame discriminant pattern as CurrentActivityResponse; kept as a\nseparate model because it's a semantically distinct cursor\n(``time_open_block`` vs ``current_activity``), matching the client's\nseparate ``OpenTimer`` / ``CheckinCurrent`` types."
+      },
+      "PendingCheckinResponse": {
+        "properties": {
+          "pending": {
+            "type": "boolean",
+            "title": "Pending"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "question_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Type"
+          },
+          "question_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending"
+        ],
+        "title": "PendingCheckinResponse",
+        "description": "GET /api/checkin/pending \u2014 both branches always carry ``pending``.\n\nThis is the model for the bug this pass exists to prevent: the endpoint\nused to omit ``pending`` on the populated branch entirely. Route uses\nresponse_model_exclude_none so the empty branch stays the original bare\n``{\"pending\": false}`` shape."
+      },
+      "PushRegisterRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "platform"
+        ],
+        "title": "PushRegisterRequest"
+      },
+      "PushRegisterResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "user": {
+            "type": "string",
+            "title": "User"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "token",
+          "platform",
+          "user",
+          "last_seen_at"
+        ],
+        "title": "PushRegisterResponse",
+        "description": "Mirrors the ``DeviceToken`` fields echoed back by ``register_device_token``."
+      },
+      "SetBudgetRequest": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit"
+        ],
+        "title": "SetBudgetRequest"
+      },
+      "StatusResponse": {
+        "properties": {
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "checkin_coverage": {
+            "$ref": "#/components/schemas/CheckinCoverageResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "open",
+          "completed",
+          "overdue",
+          "checkin_coverage"
+        ],
+        "title": "StatusResponse",
+        "description": "Mirrors the aggregate dict built by ``status_endpoint``."
+      },
+      "TaskResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_ref": {
+            "type": "string",
+            "title": "Source Ref"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence"
+          },
+          "recurrence_parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Parent Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "project",
+          "priority",
+          "due_date",
+          "labels",
+          "status",
+          "source",
+          "source_ref",
+          "recurrence",
+          "recurrence_parent_id",
+          "created_at",
+          "completed_at",
+          "updated_at",
+          "metadata"
+        ],
+        "title": "TaskResponse",
+        "description": "Mirrors ``fennoc.store.accessors.Task`` (table `tasks`, migration 006/007)."
+      },
+      "TimeActionResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "TimeActionResponse",
+        "description": "Shared shape for /api/time/start and /api/time/stop."
+      },
+      "TimeBlockResponse": {
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "title": "Block Id"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "title": "Ended At"
+          },
+          "duration_s": {
+            "type": "integer",
+            "title": "Duration S"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "metadata": {
+            "type": "string",
+            "title": "Metadata"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "block_id",
+          "started_at",
+          "ended_at",
+          "duration_s",
+          "source",
+          "category",
+          "label",
+          "confidence",
+          "idempotency_key",
+          "metadata",
+          "created_at"
+        ],
+        "title": "TimeBlockResponse",
+        "description": "Mirrors ``fennoc.store.accessors.TimeBlock`` (table `time_blocks`, migration 005).\n\n``metadata`` is a JSON string on the wire, not an object \u2014 matches the\ndataclass field and the pre-existing warning in the client's types.ts."
+      },
+      "TimeStartRequest": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "title": "TimeStartRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

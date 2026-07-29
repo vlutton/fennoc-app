@@ -5,6 +5,8 @@ import axios, {
 } from "axios";
 
 import type {
+  AgentMessage,
+  AgentMessageCreated,
   Briefing,
   Budget,
   CaptureOpts,
@@ -190,4 +192,12 @@ export async function getBudget(): Promise<Budget> {
 
 export async function setBudgetLimit(limit: number): Promise<Budget> {
   return request<Budget>("PATCH", "/api/budget", { limit });
+}
+
+export async function sendAgentMessage(text: string): Promise<AgentMessageCreated> {
+  return request<AgentMessageCreated>("POST", "/api/message", { text });
+}
+
+export async function getAgentMessage(id: string): Promise<AgentMessage> {
+  return request<AgentMessage>("GET", `/api/message/${id}`);
 }

@@ -1,14 +1,17 @@
 import { isAxiosError } from "axios";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { formatApiError } from "../api/client";
 import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
 import { LedgerSheet } from "../components/LedgerSheet";
 import { NextStrip } from "../components/NextStrip";
+import { ReplySheet } from "../components/ReplySheet";
 import { StatusStrip } from "../components/StatusStrip";
+import { useAgentMessagePoll } from "../hooks/useAgentMessage";
 import { useEveningBriefing, useMorningBriefing } from "../hooks/useBriefing";
 import { usePendingCheckin, useReplyCheckin } from "../hooks/useHome";
 import { useThreadStore, useTodayCaptures } from "../store/useThread";
@@ -33,7 +36,17 @@ const EVENING_BRIEFING_TIME = "18:00";
 type ThreadMessage =
   | { id: string; kind: "fennoc-briefing"; atMs: number; stamp: string; label: string }
   | { id: string; kind: "fennoc-line"; atMs: number; stamp: string; text: string }
-  | { id: string; kind: "user-capture"; atMs: number; text: string };
+  | { id: string; kind: "user-capture"; atMs: number; text: string }
+  | {
+      id: string;
+      kind: "agent-turn";
+      atMs: number;
+      stamp: string;
+      messageId: string;
+      state: "thinking" | "done" | "error";
+      text: string;
+      body: string | null;
+    };
 
 /**
  * A plain thing Fennoc said — no action attached. Same unboxed treatment as
@@ -84,6 +97,86 @@ function UserBubble({ text }: { text: string }) {
       </View>
     </View>
   );
+}
+
+/**
+ * An agent turn still running (INT-029b). Deliberately just a stamp and a
+ * static line — `signal` (amber) is reserved for exactly an unanswered
+ * question and a running timer, so it does not belong here, and a looping
+ * placeholder would only have to be thrown away once `presence.think`
+ * (INT-025's actual signature interaction for this state) ships.
+ */
+function AgentThinking({ stamp }: { stamp: string }) {
+  return (
+    <View>
+      <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
+        {stamp}
+      </Text>
+      {/* TODO(INT-025): replace with the real presence.think mark. Not
+          invented here — see the comment above this component. */}
+      <Text className="mt-1 font-sans text-lead text-ink-muted">Thinking…</Text>
+    </View>
+  );
+}
+
+/** An agent turn that came back `error`. The user's bubble above it (pushed
+ * by CaptureBar's onSuccess before the pending entry) stays visible — this
+ * only replaces what Fennoc says, not what the user said. */
+function AgentError({ stamp, error }: { stamp: string; error: string }) {
+  return (
+    <View>
+      <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
+        {stamp}
+      </Text>
+      <Text className="mt-1 font-sans text-lead text-alert">{error}</Text>
+    </View>
+  );
+}
+
+/**
+ * Polls one in-flight agent turn (`GET /api/message/{id}`) and resolves it
+ * into the thread store once the server reports `done` or `error`. Renders
+ * nothing — ThreadScreen renders one of these per "thinking" entry, which
+ * keeps the polling declarative and handles several queued turns at once
+ * without any special-casing here.
+ */
+function AgentTurnWatcher({ messageId }: { messageId: string }) {
+  const resolveAgent = useThreadStore((s) => s.resolveAgent);
+  const { data, isError, error } = useAgentMessagePoll(messageId);
+
+  useEffect(() => {
+    // A poll that can't reach the server has to terminate somewhere. React
+    // Query has already exhausted its retries by the time `isError` is set,
+    // and leaving the entry on "Thinking…" indefinitely is the one outcome
+    // this product can't afford — the same rule the capture error follows.
+    // Resolving to `error` is terminal (the watcher unmounts, since it only
+    // renders for "thinking" entries), so the user re-sends rather than
+    // waiting on a spinner that will never resolve. Their own bubble stays.
+    if (isError) {
+      resolveAgent(messageId, {
+        text: formatApiError(error) || "Couldn't reach Fennoc.",
+        body: null,
+        state: "error",
+      });
+      return;
+    }
+    if (!data) return;
+    if (data.status === "done") {
+      resolveAgent(messageId, {
+        text: data.reply_lede ?? data.reply ?? "",
+        body: data.reply_body,
+        state: "done",
+      });
+    } else if (data.status === "error") {
+      resolveAgent(messageId, {
+        text: data.error ?? "That didn't go through.",
+        body: null,
+        state: "error",
+      });
+    }
+  }, [data, error, isError, messageId, resolveAgent]);
+
+  return null;
 }
 
 function ThreadTerminus() {
@@ -147,6 +240,19 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     }
     for (const capture of captures) {
       const atMs = new Date(capture.createdAt).getTime();
+      if (capture.speaker === "fennoc" && capture.agent) {
+        list.push({
+          id: capture.id,
+          kind: "agent-turn",
+          atMs,
+          stamp: formatTimeOfDay(capture.createdAt),
+          messageId: capture.agent.messageId,
+          state: capture.agent.state,
+          text: capture.text,
+          body: capture.agent.body,
+        });
+        continue;
+      }
       list.push(
         capture.speaker === "fennoc"
           ? {
@@ -162,6 +268,22 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
 
     return list.sort((a, b) => a.atMs - b.atMs);
   }, [captures, eveningBriefing.data, morningBriefing.data, today]);
+
+  // Every currently-"thinking" agent entry gets its own poller — see
+  // AgentTurnWatcher above. Derived in useMemo, not read off the zustand
+  // selector directly, for the same reason `useTodayCaptures` filters in a
+  // useMemo rather than the selector: a selector that allocates (`.filter`
+  // here) makes every store read look like a change.
+  const pendingAgentIds = useMemo(
+    () =>
+      captures
+        .filter((c) => c.agent?.state === "thinking")
+        .map((c) => c.agent?.messageId)
+        .filter((id): id is string => id !== undefined),
+    [captures],
+  );
+
+  const [openReplyBody, setOpenReplyBody] = useState<string | null>(null);
 
   const onOpenLedger = () => {
     setLedgerOpen(true);
@@ -247,10 +369,46 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
           if (message.kind === "fennoc-line") {
             return <FennocLine key={message.id} stamp={message.stamp} text={message.text} />;
           }
+          if (message.kind === "agent-turn") {
+            if (message.state === "thinking") {
+              return <AgentThinking key={message.id} stamp={message.stamp} />;
+            }
+            if (message.state === "error") {
+              return (
+                <AgentError
+                  key={message.id}
+                  error={message.text || "That didn't go through."}
+                  stamp={message.stamp}
+                />
+              );
+            }
+            return (
+              <View key={message.id}>
+                <FennocLine stamp={message.stamp} text={message.text} />
+                {message.body !== null ? (
+                  <Pressable
+                    accessibilityLabel="Read the rest"
+                    accessibilityRole="button"
+                    className="mt-2 h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
+                    onPress={() => setOpenReplyBody(message.body)}
+                  >
+                    <Text className="font-sans-medium text-label text-ink">Read the rest</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          }
           return <UserBubble key={message.id} text={message.text} />;
         })}
         <ThreadTerminus />
       </ScrollView>
+
+      {/* One poller per in-flight agent turn (see AgentTurnWatcher above).
+          Renders nothing — this just keeps polling declarative for however
+          many turns are queued at once. */}
+      {pendingAgentIds.map((messageId) => (
+        <AgentTurnWatcher key={messageId} messageId={messageId} />
+      ))}
 
       {/*
         The manifest sets android:windowSoftInputMode="adjustResize", but Expo
@@ -276,6 +434,11 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
       </KeyboardAvoidingView>
 
       <LedgerSheet onClose={() => setLedgerOpen(false)} visible={ledgerOpen} />
+      <ReplySheet
+        body={openReplyBody}
+        onClose={() => setOpenReplyBody(null)}
+        visible={openReplyBody !== null}
+      />
     </SafeAreaView>
   );
 }

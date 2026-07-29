@@ -10,6 +10,9 @@ import {
 } from "react-native";
 
 import { useCapture } from "../hooks/useHome";
+import { useSendAgentMessage } from "../hooks/useAgentMessage";
+import { isNetworkError } from "../outbox";
+import { useThreadStore } from "../store/useThread";
 import { useTheme } from "../theme/useTheme";
 
 type Feedback = "captured" | "queued" | "error" | null;
@@ -21,11 +24,19 @@ type Feedback = "captured" | "queued" | "error" | null;
  * screen and the default input.
  *
  * Voice capture itself (listening, auto-stop on silence, haptic + tone
- * confirmation) is INT-025 scope. This shell wires the mic to the same
- * capture mutation the composer's text uses — tapping it sends whatever
- * has been typed. With nothing typed it's a no-op (see comment below)
- * rather than a fake "recording" state with no real transcription behind
- * it.
+ * confirmation) is INT-025 scope. This shell wires the mic to the same send
+ * path the composer's text uses — tapping it sends whatever has been
+ * typed. With nothing typed it's a no-op (see comment below) rather than a
+ * fake "recording" state with no real transcription behind it.
+ *
+ * Product decision (INT-029b): the composer talks to the *agent*
+ * (`POST /api/message`), not `/api/capture`, because the thread is a
+ * conversation — Fennoc reads the message and replies in-thread, which
+ * `/api/capture` has no way to do. `/api/capture` remains underneath it as
+ * the instant, offline-safe path: `useCapture` (still wired below) is what
+ * actually queues to the outbox, and is exactly what runs when the agent
+ * send fails because the device has no network — a thought must still land
+ * somewhere even if there's no one to read it yet.
  */
 export function CaptureBar() {
   const { palette } = useTheme();
@@ -35,6 +46,12 @@ export function CaptureBar() {
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const captureMutation = useCapture();
+  const sendAgentMessage = useSendAgentMessage();
+  // Selected as an action reference, not derived state — see the store's own
+  // "Maximum update depth exceeded" warning on why a selector here must
+  // never allocate.
+  const addCapture = useThreadStore((s) => s.addCapture);
+  const addAgentPending = useThreadStore((s) => s.addAgentPending);
 
   useEffect(() => {
     return () => {
@@ -58,12 +75,12 @@ export function CaptureBar() {
     }, 1500);
   };
 
-  const onSubmit = () => {
-    const trimmed = text.trim();
-    if (!trimmed || captureMutation.isPending) return;
-
+  // Fallback path: the existing /api/capture mutation, used only when the
+  // agent send fails offline. It already queues to the outbox and echoes
+  // the user's own bubble in its own onSuccess (see useHome.ts), so this
+  // wrapper only needs to translate its result into composer feedback.
+  const fallbackToCapture = (trimmed: string) => {
     const idempotencyKey = Crypto.randomUUID();
-
     captureMutation.mutate(
       {
         text: trimmed,
@@ -86,7 +103,43 @@ export function CaptureBar() {
     );
   };
 
-  const pending = captureMutation.isPending;
+  const onSubmit = () => {
+    const trimmed = text.trim();
+    if (!trimmed || sendAgentMessage.isPending || captureMutation.isPending) return;
+
+    // A lingering ERROR "clears on the next attempt" (see showFeedback
+    // above) — that only happens if something here actually clears it, since
+    // a successful agent send below doesn't call showFeedback itself.
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    setFeedback(null);
+    setErrorMsg(null);
+
+    sendAgentMessage.mutate(trimmed, {
+      onSuccess: (result) => {
+        // The user's own bubble, then a pending Fennoc entry the
+        // AgentTurnWatcher (ThreadScreen) will resolve once the turn
+        // finishes — see useThread.ts's addAgentPending/resolveAgent.
+        addCapture(trimmed);
+        addAgentPending(result.id);
+        setText("");
+      },
+      onError: (error) => {
+        // A thought must never go missing because the network dropped:
+        // fall back to the offline-safe capture path, which queues to the
+        // outbox. A real (non-network) server error on /api/message is
+        // reported as-is instead — falling back there would silently
+        // re-route a genuine agent failure through a different endpoint.
+        if (isNetworkError(error)) {
+          fallbackToCapture(trimmed);
+          return;
+        }
+        const message = error instanceof Error ? error.message : "Send failed";
+        showFeedback("error", message);
+      },
+    });
+  };
+
+  const pending = sendAgentMessage.isPending || captureMutation.isPending;
 
   const onMicPress = () => {
     if (text.trim().length > 0) {

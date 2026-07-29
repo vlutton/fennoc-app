@@ -34,6 +34,12 @@ export type CheckinCoverage = components["schemas"]["CheckinCoverageResponse"];
 
 export type Budget = components["schemas"]["BudgetResponse"];
 
+/** POST /api/message — 202 Accepted; the row has just been created (INT-029b). */
+export type AgentMessageCreated = components["schemas"]["AgentMessageCreatedResponse"];
+
+/** GET /api/message/{id} and /api/messages — full `agent_messages` row (INT-029b). */
+export type AgentMessage = components["schemas"]["AgentMessageResponse"];
+
 // ---------------------------------------------------------------------------
 // Hand-written types below.
 //
