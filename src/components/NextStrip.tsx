@@ -97,7 +97,11 @@ export function NextStrip() {
       <View className={`${ROW_CLASS} border border-line-hairline bg-bg-raised`}>
         <NextLabel />
         <View className="flex-1">
-          <Text className="font-sans text-body text-ink" numberOfLines={1}>
+          {/* Two lines, not one. Reported from a real device: the strip read
+              "CA Trip: Set Thu 7/30 rever…" and the operator could not tell
+              what it was referring to. Same defect as the ledger rows — a
+              title you can't read can't be acted on. */}
+          <Text className="font-sans text-body text-ink" numberOfLines={2}>
             {nextTask.title}
           </Text>
           <Text
@@ -108,10 +112,23 @@ export function NextStrip() {
             {nextTask.due_date ? " · DUE TODAY" : ""}
           </Text>
         </View>
+        {/*
+          Labelled "Start timer", not "Start". Reported: "there's a Start
+          button, I'm not sure what action I'm supposed to take or what Start
+          does." It was never ambiguous in the code — it begins a time-tracking
+          block against this task — but the button never said so, and the only
+          place that became clear was AFTER pressing it, when the strip flipped
+          to a running clock. A control whose meaning is only discoverable by
+          triggering it is not labelled.
+
+          TODO: `category` is hardcoded to "work", so a personal task gets
+          tracked as work. Needs a real category source (the task's project is
+          the obvious candidate) — not guessed at here.
+        */}
         <Pressable
-          accessibilityLabel={`Start ${nextTask.title}`}
+          accessibilityLabel={`Start a timer for ${nextTask.title}`}
           accessibilityRole="button"
-          className="h-touch items-center justify-center rounded-sm border border-line-strong px-4 active:opacity-80"
+          className="h-touch items-center justify-center rounded-sm border border-line-strong px-3 active:opacity-80"
           disabled={startTimeMutation.isPending}
           onPress={() =>
             startTimeMutation.mutate({
@@ -120,7 +137,7 @@ export function NextStrip() {
             })
           }
         >
-          <Text className="font-sans-medium text-label text-ink">Start</Text>
+          <Text className="font-sans-medium text-label text-ink">Start timer</Text>
         </Pressable>
       </View>
     );

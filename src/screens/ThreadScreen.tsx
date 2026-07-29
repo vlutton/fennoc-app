@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { formatApiError } from "../api/client";
+import { BriefingSheet } from "../components/BriefingSheet";
 import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
@@ -34,7 +35,16 @@ const MORNING_BRIEFING_TIME = "06:45";
 const EVENING_BRIEFING_TIME = "18:00";
 
 type ThreadMessage =
-  | { id: string; kind: "fennoc-briefing"; atMs: number; stamp: string; label: string }
+  | {
+      id: string;
+      kind: "fennoc-briefing";
+      atMs: number;
+      stamp: string;
+      label: string;
+      /** What the "Read briefing" sheet should show as its title/body. */
+      title: string;
+      text: string;
+    }
   | { id: string; kind: "fennoc-line"; atMs: number; stamp: string; text: string }
   | { id: string; kind: "user-capture"; atMs: number; text: string }
   | {
@@ -64,26 +74,44 @@ function FennocLine({ stamp, text }: { stamp: string; text: string }) {
   );
 }
 
-/** Fennoc speaks unboxed — no bubble, no avatar. Fennoc is the environment;
- * the user is the guest. Do not symmetrise this with UserBubble below. */
-function FennocMessage({ stamp, label }: { stamp: string; label: string }) {
+/**
+ * Fennoc speaks unboxed — no bubble, no avatar. Fennoc is the environment;
+ * the user is the guest. Do not symmetrise this with UserBubble below.
+ *
+ * `onOpen` is undefined exactly when there's nothing to open — the caller
+ * (ThreadScreen) only supplies it once it has real briefing text in hand.
+ * The "Read briefing" button is therefore only ever rendered when it would
+ * actually do something: reported from a real device, "Clicking the 'Read
+ * briefing' button makes a noise but doesn't actually do anything" was the
+ * bug, and a button with nothing behind it is exactly that bug, so this
+ * component doesn't render one to guard against a null body — see
+ * BriefingSheet's own note.
+ */
+function FennocMessage({
+  stamp,
+  label,
+  onOpen,
+}: {
+  stamp: string;
+  label: string;
+  onOpen?: () => void;
+}) {
   return (
     <View>
       <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
         {stamp}
       </Text>
       <Text className="mt-1 font-sans text-lead text-ink">{label}</Text>
-      <Pressable
-        accessibilityLabel="Read briefing"
-        accessibilityRole="button"
-        className="mt-2 h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
-        onPress={() => {
-          // TODO(INT-024): open the markdown briefing reader sheet. The
-          // full briefing body is deliberately not rendered inline here.
-        }}
-      >
-        <Text className="font-sans-medium text-label text-ink">Read briefing</Text>
-      </Pressable>
+      {onOpen ? (
+        <Pressable
+          accessibilityLabel="Read briefing"
+          accessibilityRole="button"
+          className="mt-2 h-touch flex-row items-center self-start rounded-sm border border-line-strong px-3 active:opacity-80"
+          onPress={onOpen}
+        >
+          <Text className="font-sans-medium text-label text-ink">Read briefing</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -100,21 +128,24 @@ function UserBubble({ text }: { text: string }) {
 }
 
 /**
- * An agent turn still running (INT-029b). Deliberately just a stamp and a
- * static line — `signal` (amber) is reserved for exactly an unanswered
- * question and a running timer, so it does not belong here, and a looping
- * placeholder would only have to be thrown away once `presence.think`
- * (INT-025's actual signature interaction for this state) ships.
+ * An agent turn still running (INT-029b) — `presence.think`, the design's
+ * signature "it is working" animation. `signal` (amber) is reserved for
+ * exactly an unanswered question and a running timer, so it still doesn't
+ * belong here; the mark plus the "THINKING" label carry that meaning
+ * instead. The full presence state machine (listening/done) remains
+ * INT-025 — this only builds the "thinking" state.
  */
 function AgentThinking({ stamp }: { stamp: string }) {
+  const { palette } = useTheme();
   return (
     <View>
       <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
         {stamp}
       </Text>
-      {/* TODO(INT-025): replace with the real presence.think mark. Not
-          invented here — see the comment above this component. */}
-      <Text className="mt-1 font-sans text-lead text-ink-muted">Thinking…</Text>
+      <View className="mt-1 flex-row items-center gap-2">
+        <FennocMark color={palette.ink.muted} size={28} state="thinking" />
+        <Text className="font-mono-medium text-dataSm text-ink-muted">THINKING</Text>
+      </View>
     </View>
   );
 }
@@ -249,6 +280,8 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         atMs: new Date(`${today}T${MORNING_BRIEFING_TIME}:00`).getTime(),
         stamp: `${MORNING_BRIEFING_TIME} · MORNING`,
         label: "Morning briefing ready.",
+        title: "Morning briefing",
+        text: morningBriefing.data.text,
       });
     }
     if (eveningBriefing.data?.text && eveningBriefing.data.date === today) {
@@ -258,6 +291,8 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         atMs: new Date(`${today}T${EVENING_BRIEFING_TIME}:00`).getTime(),
         stamp: `${EVENING_BRIEFING_TIME} · EVENING`,
         label: "Evening briefing ready.",
+        title: "Evening briefing",
+        text: eveningBriefing.data.text,
       });
     }
     for (const capture of captures) {
@@ -314,6 +349,10 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     body: string;
     quote: string;
   } | null>(null);
+
+  // Which briefing (if any) the "Read briefing" sheet is currently showing —
+  // see FennocMessage's onOpen and BriefingSheet below.
+  const [openBriefing, setOpenBriefing] = useState<{ title: string; text: string } | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -419,7 +458,12 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         {messages.map((message) => {
           if (message.kind === "fennoc-briefing") {
             return (
-              <FennocMessage key={message.id} label={message.label} stamp={message.stamp} />
+              <FennocMessage
+                key={message.id}
+                label={message.label}
+                onOpen={() => setOpenBriefing({ title: message.title, text: message.text })}
+                stamp={message.stamp}
+              />
             );
           }
           if (message.kind === "fennoc-line") {
@@ -532,6 +576,12 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         onReply={onReply}
         quote={openReplyMessage?.quote ?? ""}
         visible={openReplyMessage !== null}
+      />
+      <BriefingSheet
+        onClose={() => setOpenBriefing(null)}
+        text={openBriefing?.text ?? null}
+        title={openBriefing?.title ?? ""}
+        visible={openBriefing !== null}
       />
     </SafeAreaView>
   );

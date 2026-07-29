@@ -25,12 +25,14 @@ const colors = {
     signal: "#9A5B00", signalWash: "#F7E4C4",
     positive: "#4E5C2E", clay: "#8A5342", alert: "#A33A1C",
     // The three fields below have no day-mode value in design_handoff's
-    // README — they're unused today (no `bg-bg-float` / `text-ink-disabled`
-    // / `bg-signal-on` classNames exist anywhere, and colors.ts's `Palette`
-    // type never surfaces them to JS callers either). They're only defined
-    // here so every CSS variable tailwind.config.js references has SOME
-    // day-mode value once vars() swaps the palette; if any of these three
-    // become load-bearing, replace these with real design values.
+    // README. `float` and `signalOn` are still unused today (no `bg-bg-float`
+    // / `bg-signal-on` classNames exist anywhere) and only defined here so
+    // every CSS variable tailwind.config.js references has SOME day-mode
+    // value once vars() swaps the palette. `inkDisabled` IS surfaced now —
+    // colors.ts's `Palette.ink.disabled` reads it, for FennocMark's
+    // `presence.think` third column (INT-025's motion spec). If `float` or
+    // `signalOn` become load-bearing too, replace these with real design
+    // values the same way.
     float: "#FFFFFF", // day's overlay is already pure white; float can't go lighter
     inkDisabled: "#9A8F82", // fainter than inkMuted, same direction as night's ratio
     signalOn: "#FFFCF7", // day's signal is a dark amber (unlike night's bright one) — needs light "on" text, not dark

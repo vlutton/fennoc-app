@@ -30,7 +30,7 @@ export const rawTokens = tokens.colors;
 export interface Palette {
   bg: { base: string; raised: string; overlay: string };
   line: { hairline: string; strong: string };
-  ink: { DEFAULT: string; secondary: string; muted: string };
+  ink: { DEFAULT: string; secondary: string; muted: string; disabled: string };
   signal: { DEFAULT: string; wash: string };
   positive: string;
   clay: string;
@@ -51,6 +51,7 @@ export const nightPalette: Palette = {
     DEFAULT: rawTokens.ink.DEFAULT,
     secondary: rawTokens.ink.secondary,
     muted: rawTokens.ink.muted,
+    disabled: rawTokens.ink.disabled,
   },
   signal: {
     DEFAULT: rawTokens.signal.DEFAULT,
@@ -75,6 +76,7 @@ export const dayPalette: Palette = {
     DEFAULT: rawTokens.day.ink,
     secondary: rawTokens.day.inkSecondary,
     muted: rawTokens.day.inkMuted,
+    disabled: rawTokens.day.inkDisabled,
   },
   signal: {
     DEFAULT: rawTokens.day.signal,
