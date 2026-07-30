@@ -137,7 +137,9 @@ export function SettingsScreen() {
         // against the `device_tokens` row on the server without splashing
         // the whole thing on screen.
         const shown =
-          result.token.length > 20 ? `${result.token.slice(0, 20)}…` : result.token;
+          result.token.length > 20
+            ? `${result.token.slice(0, 20)}…`
+            : result.token;
         setDevNotifStatus(`Registered: ${shown}`);
         break;
       }
@@ -146,7 +148,7 @@ export function SettingsScreen() {
         break;
       case "skipped-no-permission":
         setDevNotifStatus(
-          "Skipped — permission not granted yet. Tap \"Enable notifications\" first.",
+          'Skipped — permission not granted yet. Tap "Enable notifications" first.',
         );
         break;
       case "failed":
@@ -225,9 +227,7 @@ export function SettingsScreen() {
             </Text>
           )}
           {connection.kind === "loading" && (
-            <Text className="text-base leading-6 text-olive">
-              Checking…
-            </Text>
+            <Text className="text-base leading-6 text-olive">Checking…</Text>
           )}
           {connection.kind === "ok" && (
             <Text className="text-base leading-6 text-olive">
@@ -268,59 +268,72 @@ export function SettingsScreen() {
           })}
         </View>
 
-        {__DEV__ ? (
-          <View className="mt-8 rounded-xl border border-sand bg-cream p-4">
-            <Text className="text-base font-semibold leading-6 text-olive">
-              Dev: notifications (INT-020)
+        {/*
+          Not gated on `__DEV__`. It was, and that made this section invisible
+          in exactly the builds it is needed in: `__DEV__` is false in any
+          release build, which includes the internal `preview` APKs used for
+          on-device testing. The result was an app where notification
+          permission could not be granted at all — this is the only call site
+          for it — and so a push token could never be acquired either, since
+          registration is deliberately gated on permission already being
+          granted.
+
+          This app ships to one person through internal distribution and is on
+          no store, so an always-visible testing panel costs nothing. Gate it
+          again only once there is a real onboarding path for permission, and
+          not on `__DEV__`, which does not mean "internal build".
+        */}
+        <View className="mt-8 rounded-xl border border-sand bg-cream p-4">
+          <Text className="text-base font-semibold leading-6 text-olive">
+            Notifications (testing)
+          </Text>
+          <Text className="mt-1 text-sm leading-5 text-olive opacity-70">
+            Grant permission, then register this device so Fennoc can reach it.
+            The per-channel buttons fire local test pings to check importance,
+            sound, and action set.
+          </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            className="mt-4 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+            onPress={onRequestDevPermission}
+          >
+            <Text className="text-base font-semibold leading-6 text-signal-on">
+              Enable notifications
             </Text>
-            <Text className="mt-1 text-sm leading-5 text-olive opacity-70">
-              Local test pings only — no remote transport is wired up yet.
-              Grant permission once, then fire each channel to check its
-              importance, sound, and action set.
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            className="mt-3 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+            onPress={onRegisterDevice}
+          >
+            <Text className="text-base font-semibold leading-6 text-signal-on">
+              Register this device
             </Text>
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              className="mt-4 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
-              onPress={onRequestDevPermission}
-            >
-              <Text className="text-base font-semibold leading-6 text-signal-on">
-                Enable notifications
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              className="mt-3 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
-              onPress={onRegisterDevice}
-            >
-              <Text className="text-base font-semibold leading-6 text-signal-on">
-                Register this device
-              </Text>
-            </Pressable>
-
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              {CHANNEL_IDS.map((channelId) => (
-                <Pressable
-                  key={channelId}
-                  accessibilityRole="button"
-                  className="min-h-12 min-w-24 flex-1 items-center justify-center rounded-lg bg-olive px-3 active:opacity-80"
-                  onPress={onFireDevNotification(channelId)}
-                >
-                  <Text className="text-base font-medium capitalize leading-6 text-cream">
-                    {channelId}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {devNotifStatus ? (
-              <Text className="mt-3 text-sm leading-5 text-olive">
-                {devNotifStatus}
-              </Text>
-            ) : null}
+          <View className="mt-3 flex-row flex-wrap gap-2">
+            {CHANNEL_IDS.map((channelId) => (
+              <Pressable
+                key={channelId}
+                accessibilityRole="button"
+                className="min-h-12 min-w-24 flex-1 items-center justify-center rounded-lg bg-olive px-3 active:opacity-80"
+                onPress={onFireDevNotification(channelId)}
+              >
+                <Text className="text-base font-medium capitalize leading-6 text-cream">
+                  {channelId}
+                </Text>
+              </Pressable>
+            ))}
           </View>
-        ) : null}
+
+          {devNotifStatus ? (
+            <Text className="mt-3 text-sm leading-5 text-olive">
+              {devNotifStatus}
+            </Text>
+          ) : null}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
