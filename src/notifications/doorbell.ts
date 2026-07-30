@@ -12,8 +12,9 @@
  * This module's job: notice that pointer arrive, fetch the real content from
  * `GET /api/message/{id}` (already wired for INT-029b polling — see
  * `getAgentMessage` in ../api/client.ts and `useAgentMessagePoll`), and post
- * a LOCAL notification built from `reply_lede` (title) / `reply_body`
- * (body), on the right channel, with that channel's category — the same
+ * a LOCAL notification built from the turn's text (see `toNotificationText`
+ * for how that becomes a title and a body — they are NOT the server's
+ * lede/body split), on the right channel, with that channel's category — the same
  * shape `devTrigger.ts` builds for its dev-only fixtures, so action buttons
  * and the `questions` text-input reply keep working no matter which path
  * produced the notification. `devTrigger.ts` itself is untouched; the shape
@@ -199,7 +200,68 @@ async function handleDoorbellNotification(payload: DoorbellPayload): Promise<voi
     return;
   }
 
-  await postLocalNotificationAsync(payload.channel, message.reply_lede, message.reply_body);
+  const { title, body } = toNotificationText(
+    payload.channel,
+    message.reply_lede,
+    message.reply_body,
+  );
+  await postLocalNotificationAsync(payload.channel, title, body);
+}
+
+/** Short, human titles per channel, used when the message has no usable one. */
+const CHANNEL_TITLE: Record<ChannelId, string> = {
+  questions: "Fennoc has a question",
+  returns: "Something came back",
+  briefing: "Your briefing",
+  tracking: "Tracking",
+};
+
+/**
+ * Longest lede we will promote to a notification title. Past this Android
+ * ellipsises it into uselessness, and iOS gives it one line.
+ */
+const MAX_TITLE_CHARS = 60;
+
+/**
+ * Turn a thread turn's `(reply_lede, reply_body)` into a notification's
+ * `(title, body)`. These are NOT the same split, which is the bug this
+ * function exists to fix.
+ *
+ * `split_reply` on the server divides a reply by LINE COUNT, answering "is
+ * this long enough to need a Read affordance in the thread?" — so a short
+ * reply comes back whole as the lede with a null body, by design. Feeding
+ * that straight into a notification put the entire message in the TITLE and
+ * left the body empty: Android truncated the title in the shade and there
+ * was nothing to expand into, so the notification arrived carrying no
+ * readable content at all.
+ *
+ * The rule here is that THE BODY ALWAYS CARRIES THE FULL TEXT. A title is
+ * decoration; losing it costs nothing. Losing the message is the actual
+ * failure, so nothing is ever routed exclusively through the title.
+ */
+export function toNotificationText(
+  channel: ChannelId,
+  lede: string,
+  body: string | null,
+): { title: string; body: string } {
+  const full = body ? `${lede}\n\n${body}` : lede;
+
+  // A short single-line lede makes a good title — "The shelving's back."
+  // Anything longer, or anything with a line break in it, is prose rather
+  // than a heading, so it belongs in the body under a generic title.
+  const usableAsTitle =
+    !lede.includes("\n") && lede.length <= MAX_TITLE_CHARS;
+
+  if (usableAsTitle && body) {
+    // Genuine heading + detail: keep the server's split as-is.
+    return { title: lede, body };
+  }
+  if (usableAsTitle) {
+    // Short message, no body. Show it as the body under a channel title so
+    // the text is in the expandable region rather than the truncated one.
+    return { title: CHANNEL_TITLE[channel], body: lede };
+  }
+  return { title: CHANNEL_TITLE[channel], body: full };
 }
 
 /**
