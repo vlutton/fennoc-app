@@ -423,7 +423,7 @@ export interface components {
             /** Status */
             status: string;
             /** Text */
-            text: string;
+            text: string | null;
             /** Reply */
             reply: string | null;
             /** Reply Lede */
@@ -446,6 +446,10 @@ export interface components {
             voice_violations: {
                 [key: string]: unknown;
             }[] | null;
+            /** Kind */
+            kind: string;
+            /** Trigger */
+            trigger: string | null;
         };
         /**
          * BriefingResponse

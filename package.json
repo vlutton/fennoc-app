@@ -44,7 +44,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "gen:api-schema": "curl -sf http://127.0.0.1:8644/openapi.json -o src/api/openapi.schema.json && node -e \"JSON.parse(require('fs').readFileSync('src/api/openapi.schema.json','utf8'))\" && echo 'wrote src/api/openapi.schema.json from http://127.0.0.1:8644'",
+    "gen:api-schema": "curl -sf http://127.0.0.1:8643/openapi.json -o src/api/openapi.schema.json && node -e \"JSON.parse(require('fs').readFileSync('src/api/openapi.schema.json','utf8'))\" && echo 'wrote src/api/openapi.schema.json from http://127.0.0.1:8643'",
     "gen:api-types": "npx -y openapi-typescript@7 src/api/openapi.schema.json -o src/api/schema.gen.ts"
   },
   "private": true
