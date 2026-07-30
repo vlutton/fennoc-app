@@ -1,0 +1,64 @@
+# What EAS Build uploads — this file REPLACES .gitignore for that upload.
+#
+# It exists for exactly one reason: google-services.json is gitignored,
+# because this repo is public and Firebase config, while documented by Google
+# as non-secret, is not something to publish by reflex. But the Android build
+# genuinely needs it — without it the app cannot register with FCM and
+# getExpoPushTokenAsync() has nothing to return, so push registration fails on
+# device with a confusing native error.
+#
+# EAS uses .easignore in preference to .gitignore when it is present, so the
+# file below is a copy of .gitignore MINUS the google-services.json line. That
+# is the whole trick: the config reaches the builder without ever reaching
+# GitHub.
+#
+# KEEP IN SYNC WITH .gitignore. Because this file shadows it completely, a new
+# .gitignore entry added here-but-not-there gets silently uploaded to EAS. The
+# expensive mistake would be adding a secret to .gitignore, assuming it is
+# excluded everywhere, and shipping it in a build context.
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Downloaded Expo Go client (208MB) — never commit
+Expo-Go-*.apk
+*.apk
+
+# NOTE: google-services.json is deliberately absent from this list. See above.
