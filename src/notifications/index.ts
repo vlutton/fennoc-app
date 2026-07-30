@@ -1,7 +1,7 @@
 /**
  * INT-020 notification layer — barrel + one-shot init.
  *
- * `initNotifications()` does the three things that must happen once, early,
+ * `initNotifications()` does the four things that must happen once, early,
  * regardless of permission state (channel/category registration is not
  * gated on permission — Android lets you create channels before the user
  * has granted POST_NOTIFICATIONS, and doing so early means the channel
@@ -10,7 +10,8 @@
  *
  *   1. Register the four Android channels (no-op on iOS/web).
  *   2. Register the four notification categories/actions (iOS + Android).
- *   3. Install the foreground handler and the response (tap/action) listener.
+ *   3. Install the foreground handler, the response (tap/action) listener,
+ *      and the doorbell (data-only push → local notification) listener.
  *
  * It deliberately does NOT request permission — see permissions.ts for why,
  * and where that call belongs instead.
@@ -21,6 +22,7 @@
  */
 import { registerNotificationCategoriesAsync } from "./categories";
 import { registerNotificationChannelsAsync } from "./channels";
+import { subscribeToDoorbellNotifications } from "./doorbell";
 import {
   configureNotificationHandler,
   subscribeToNotificationResponses,
@@ -38,16 +40,24 @@ export {
   ACTION_SWITCH,
 } from "./categories";
 export { triggerDevNotificationAsync } from "./devTrigger";
+export { subscribeToDoorbellNotifications } from "./doorbell";
 export { requestNotificationPermissionAsync } from "./permissions";
 export { registerPushTokenAsync, type RegistrationResult } from "./registration";
 
 /**
- * Call once near the app root (see App.tsx). Returns an unsubscribe
- * function for the response listener — call it on unmount.
+ * Call once near the app root (see App.tsx). Returns a single unsubscribe
+ * function composing both the response listener and the doorbell listener
+ * — callers get one handle to clean up on unmount, same contract as before
+ * this module had two listeners to manage.
  */
 export async function initNotifications(): Promise<() => void> {
   configureNotificationHandler();
-  const unsubscribe = subscribeToNotificationResponses();
+  const unsubscribeResponses = subscribeToNotificationResponses();
+  const unsubscribeDoorbell = subscribeToDoorbellNotifications();
+  const unsubscribe = () => {
+    unsubscribeResponses();
+    unsubscribeDoorbell();
+  };
 
   await Promise.all([
     registerNotificationChannelsAsync(),
