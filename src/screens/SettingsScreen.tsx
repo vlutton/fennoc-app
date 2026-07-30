@@ -13,6 +13,7 @@ import { formatApiError, getStatus, resetClient } from "../api/client";
 import type { Status } from "../api/types";
 import {
   CHANNEL_IDS,
+  registerPushTokenAsync,
   requestNotificationPermissionAsync,
   triggerDevNotificationAsync,
   type ChannelId,
@@ -118,6 +119,40 @@ export function SettingsScreen() {
         setDevNotifStatus(`"${channelId}" failed: ${formatApiError(error)}`);
       }
     };
+  }, []);
+
+  // Dev-only verification for the push-registration path. Not a
+  // production call site — registerPushTokenAsync() is also invoked
+  // automatically (and silently) from initNotifications() once permission
+  // is already granted; this button exists so a dev can trigger it
+  // on-demand and see the outcome, e.g. right after granting permission
+  // above without waiting for the next cold start.
+  const onRegisterDevice = useCallback(async () => {
+    setDevNotifStatus("Registering…");
+    const result = await registerPushTokenAsync();
+    switch (result.status) {
+      case "registered": {
+        // The token is a credential — anyone holding it can push to this
+        // device — so only a truncated prefix is shown, enough to eyeball
+        // against the `device_tokens` row on the server without splashing
+        // the whole thing on screen.
+        const shown =
+          result.token.length > 20 ? `${result.token.slice(0, 20)}…` : result.token;
+        setDevNotifStatus(`Registered: ${shown}`);
+        break;
+      }
+      case "skipped-not-a-device":
+        setDevNotifStatus(`Skipped — ${result.reason}`);
+        break;
+      case "skipped-no-permission":
+        setDevNotifStatus(
+          "Skipped — permission not granted yet. Tap \"Enable notifications\" first.",
+        );
+        break;
+      case "failed":
+        setDevNotifStatus(`Registration failed: ${result.reason}`);
+        break;
+    }
   }, []);
 
   return (
@@ -251,6 +286,16 @@ export function SettingsScreen() {
             >
               <Text className="text-base font-semibold leading-6 text-signal-on">
                 Enable notifications
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              className="mt-3 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+              onPress={onRegisterDevice}
+            >
+              <Text className="text-base font-semibold leading-6 text-signal-on">
+                Register this device
               </Text>
             </Pressable>
 

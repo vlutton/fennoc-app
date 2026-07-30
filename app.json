@@ -16,7 +16,8 @@
         "backgroundColor": "#100E0B"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.fennocapp"
+      "package": "com.fennoc.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"

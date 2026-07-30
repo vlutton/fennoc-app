@@ -18,6 +18,7 @@ import type {
   HttpMethod,
   OpenTimer,
   PendingCheckin,
+  PushRegisterResult,
   Status,
   Task,
   TimeBlock,
@@ -192,6 +193,30 @@ export async function getBudget(): Promise<Budget> {
 
 export async function setBudgetLimit(limit: number): Promise<Budget> {
   return request<Budget>("PATCH", "/api/budget", { limit });
+}
+
+// `user` is sent explicitly in the body, even though getClient() also sets
+// an `X-Fennoc-User` header on every request. That header looks like it
+// should be enough, but the server does not read it — anywhere. The
+// endpoint resolves the owner as `body.user or "vince"`, so omitting it
+// here would silently file every device token under "vince" regardless of
+// who the client says it is.
+//
+// That is invisible while there is one user and it is Vince, and wrong the
+// moment there isn't. A device token is the one row that says "notify THIS
+// person on THIS handset"; misattributing it means pushing someone else's
+// content to a stranger's phone. Cheap to get right now, expensive to
+// discover later.
+export async function registerPushToken(
+  token: string,
+  platform: string,
+): Promise<PushRegisterResult> {
+  const { userId } = useAuth.getState();
+  return request<PushRegisterResult>("POST", "/api/push/register", {
+    token,
+    platform,
+    user: userId || "vince",
+  });
 }
 
 export async function sendAgentMessage(text: string): Promise<AgentMessageCreated> {

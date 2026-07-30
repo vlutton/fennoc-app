@@ -40,6 +40,9 @@ export type AgentMessageCreated = components["schemas"]["AgentMessageCreatedResp
 /** GET /api/message/{id} and /api/messages — full `agent_messages` row (INT-029b). */
 export type AgentMessage = components["schemas"]["AgentMessageResponse"];
 
+/** POST /api/push/register — echoes back the upserted `device_tokens` row. */
+export type PushRegisterResult = components["schemas"]["PushRegisterResponse"];
+
 // ---------------------------------------------------------------------------
 // Hand-written types below.
 //
