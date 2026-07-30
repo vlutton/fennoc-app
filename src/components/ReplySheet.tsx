@@ -14,6 +14,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { useTheme } from "../theme/useTheme";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ReplySheetProps {
   visible: boolean;
@@ -157,13 +158,21 @@ function ReplySheetContent({
           contentContainerClassName="px-4 pb-8"
           style={{ paddingBottom: insets.bottom }}
         >
-          {/* Reply bodies are markdown-ish (the server splits a longer reply
-              into lede + body, it doesn't reformat it) but MarkdownRenderer
-              isn't reached for here — plain, selectable text is honest for
-              this increment and adds no new rendering surface. */}
-          <Text className="font-sans text-body text-ink" selectable>
-            {body ?? ""}
-          </Text>
+          {/* Reply bodies ARE markdown — the server splits a long reply into
+              lede + body without reformatting either half, so whatever the
+              model emitted comes through verbatim. This used to render as
+              plain text on the reasoning that it "adds no new rendering
+              surface," which was defensible when replies were short and
+              mostly prose. It stopped being true: real replies arrive with
+              headings, bullets and bold, and plain text showed the syntax
+              instead of the formatting.
+
+              BriefingSheet already renders the same kind of content through
+              MarkdownRenderer, so this is the existing surface, not a new
+              one. Selectability is lost — react-native-markdown-display does
+              not thread it through — which is the one real regression here
+              and worth revisiting if copying replies turns out to matter. */}
+          <MarkdownRenderer text={body ?? ""} />
         </ScrollView>
       </View>
     </View>
