@@ -31,6 +31,21 @@
           "icon": "./assets/ic-stat-fennoc.png",
           "color": "#F0A93B"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Fennoc reads what you point the camera at — a bill, a valve, a screen — the instant you press the shutter. The photo itself is never saved; only what it says is kept.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read — nothing else in your library is touched.",
+          "microphonePermission": false
+        }
       ]
     ],
     "extra": {

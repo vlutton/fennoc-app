@@ -9,7 +9,13 @@ export type OutboxKind =
   | "capture"
   | "checkin_reply"
   | "time_start"
-  | "time_stop";
+  | "time_stop"
+  // A held photo (Step 11's "Kept on device · goes when you're back") — the
+  // capture hot path's offline path, reusing this same queue rather than a
+  // parallel one. See src/capture/photoCapture.ts for where these get
+  // enqueued, and the `image_upload` case in ./index.ts's `replayItem` for
+  // what draining one actually does.
+  | "image_upload";
 
 export type OutboxStatus = "pending" | "inflight" | "done" | "dropped";
 
@@ -40,6 +46,15 @@ interface OutboxState {
   bumpAttempt: (id: string, error: string) => void;
   setDraining: (value: boolean) => void;
   resetInflightToPending: () => void;
+  /**
+   * Drop an item outright, with no `dropped`-status trace left behind —
+   * unlike `markDropped`, which is for a delivery that was ATTEMPTED and
+   * failed permanently. The one caller today (`cancelHeldUploadsForBatch`,
+   * src/outbox/index.ts) is for a held photo whose SEND was taken back via
+   * Undo before it ever left the device: there was no attempt, so there's
+   * nothing to record — the item should look like it never happened.
+   */
+  removeItem: (id: string) => void;
 }
 
 const MAX_ATTEMPTS = 5;
@@ -116,6 +131,10 @@ export const useOutboxStore = create<OutboxState>()(
               : item,
           ),
         }));
+      },
+
+      removeItem: (id) => {
+        set((state) => ({ items: state.items.filter((item) => item.id !== id) }));
       },
 
       setDraining: (value) => set({ draining: value }),
