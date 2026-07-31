@@ -1,10 +1,11 @@
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
-import { ArrowUp, Camera as CameraIcon, Keyboard as KeyboardIcon, Mic, X } from "lucide-react-native";
+import { ArrowUp, Camera as CameraIcon, Images, Mic, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Pressable,
   Text,
   TextInput,
@@ -35,7 +36,7 @@ const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
 
 /**
  * `bg.float`, 1px top border `line.strong`, padding 14/16, gap 14. The
- * 48×48 keyboard button is a peer that focuses the composer; it never
+ * 48×48 library button is a peer that opens the photo picker; it never
  * becomes the resting state. The 72×72 mic is the largest target on
  * screen and the default input.
  *
@@ -58,15 +59,31 @@ const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
  * bar owns, at a deliberately smaller 56×56 — see the `h-camera`/`w-camera`
  * tailwind tokens — so it never reads as competing with the mic for the
  * thumb. A tap opens `CameraCapture` (the hot path: shutter sends, no
- * review, no caption). A long-press opens the system photo library instead
- * (the cold path) and stages the result in `pendingImage` rather than
- * sending it immediately — a gallery pick is the ONE place in this whole
- * flow a caption survives (Step 15), because by the time you're choosing
- * an old photo the moment it depicts has already passed, so there's
- * something worth typing. All of the actual upload/batching/held-queue
- * logic for both paths lives in `src/capture/photoCapture.ts`, on purpose:
- * this component only decides WHEN to call it (shutter press vs. picker
- * result vs. Send with something staged), never HOW an upload behaves.
+ * review, no caption). Long-pressing it opens the system photo library
+ * instead and stages the result in `pendingImage` rather than sending it
+ * immediately — a gallery pick is the ONE place in this whole flow a
+ * caption survives (Step 15), because by the time you're choosing an old
+ * photo the moment it depicts has already passed, so there's something
+ * worth typing.
+ *
+ * Operator ruling (post-launch): that library path was ALSO reachable only
+ * via that same long-press, with no visible affordance beyond a
+ * screen-reader-only `accessibilityHint` — fine for an old photograph
+ * (there genuinely is no moment to miss), wrong for this operator's actual
+ * most-frequent use, a MacroFactor screenshot, which has no moment to miss
+ * either and was hidden behind a gesture nobody could see. Rather than add
+ * a fourth key and crowd the bar — diluting the 72px mic's deliberate
+ * dominance, "the camera never competes for the thumb" — the 48×48 keyboard
+ * button was repurposed into the library button below: tapping the
+ * composer already focuses it, so that key was a second route to something
+ * that already had one, making it the cheapest key to spend. The long-press
+ * on the camera key still opens the same library (same function,
+ * `openPhotoLibrary`) purely for free muscle-memory continuity; it is no
+ * longer the only way in. All of the actual upload/batching/held-queue
+ * logic for both the camera and library paths lives in
+ * `src/capture/photoCapture.ts`, on purpose: this component only decides
+ * WHEN to call it (shutter press vs. picker result vs. Send with something
+ * staged), never HOW an upload behaves.
  */
 export function CaptureBar() {
   const { palette } = useTheme();
@@ -82,6 +99,14 @@ export function CaptureBar() {
   const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Bumped by each of the three real send successes below (agent send,
+  // offline-capture fallback, gallery-photo send) — never by a failure, and
+  // never by the user just backspacing the composer empty by hand. That
+  // last case is why this isn't just another `text === ""` check like the
+  // height-reset effect below: `text` also goes empty on manual clearing,
+  // which must NOT slam the keyboard shut mid-edit. A dedicated counter is
+  // the smallest signal that means "a send actually happened."
+  const [sendCount, setSendCount] = useState(0);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const captureMutation = useCapture();
@@ -89,11 +114,12 @@ export function CaptureBar() {
   // The camera hot path (tap) — CameraCapture is rendered below, toggled by
   // this alone; it owns its own permission/preview/shutter state entirely.
   const [cameraOpen, setCameraOpen] = useState(false);
-  // The library cold path (long-press) — a picked-but-not-yet-sent photo,
-  // waiting on whatever the user types next as its caption (Step 15: "the
-  // next thing you say is the caption" — the ONE place that's true for a
-  // photo, since the camera hot path never has this state at all). Cleared
-  // by sending, by the X on the attachment strip, or by picking again.
+  // The library pick (`openPhotoLibrary`, tap the library key or long-press
+  // the camera key) — a picked-but-not-yet-sent photo, waiting on whatever
+  // the user types next as its caption (Step 15: "the next thing you say
+  // is the caption" — the ONE place that's true for a photo, since the
+  // camera hot path never has this state at all). Cleared by sending, by
+  // the X on the attachment strip, or by picking again.
   const [pendingImage, setPendingImage] = useState<{ uri: string; mime: string } | null>(null);
   // Selected as an action reference, not derived state — see the store's own
   // "Maximum update depth exceeded" warning on why a selector here must
@@ -122,6 +148,21 @@ export function CaptureBar() {
   useEffect(() => {
     if (text === "") setInputHeight(COMPOSER_MIN_HEIGHT);
   }, [text]);
+
+  // Collapse the keyboard after every real send. `sendCount` starts at 0 and
+  // that first render is skipped on purpose — there is nothing to dismiss on
+  // mount, and firing here unconditionally would make this effect ambiguous
+  // about whether 0 means "no send yet" or "just mounted." Declared ABOVE the
+  // reply-focus effect below so that if a send success and a Reply-CTA press
+  // ever land in the same commit, this dismiss runs first and the focus
+  // (declared after) is what wins — never the other way around, which is the
+  // "tap Reply and the keyboard closes anyway" bug this file's spec warns
+  // about. In practice the two never collide: every place that bumps
+  // `sendCount` also sets `replyingTo` to null, never to non-null.
+  useEffect(() => {
+    if (sendCount === 0) return;
+    Keyboard.dismiss();
+  }, [sendCount]);
 
   // Focus the composer the moment `replyingTo` transitions from null to
   // non-null (i.e. a Reply CTA was just pressed elsewhere in the tree).
@@ -169,6 +210,7 @@ export function CaptureBar() {
         onSuccess: (result) => {
           setText("");
           setReplyingTo(null);
+          setSendCount((n) => n + 1);
           showFeedback(result.queued ? "queued" : "captured");
         },
         onError: (error) => {
@@ -194,6 +236,7 @@ export function CaptureBar() {
     setPendingImage(null);
     setText("");
     setReplyingTo(null);
+    setSendCount((n) => n + 1);
     void captureShot(
       { uri: image.uri, mime: image.mime },
       {
@@ -207,22 +250,24 @@ export function CaptureBar() {
     );
   };
 
-  // Long-press on the camera key: the library, "cold path, picker allowed"
-  // (Step 11). Requested explicitly rather than relying on
+  // Opens the system photo library — the visible-tap route via the library
+  // key, and also the long-press route on the camera key (kept for muscle
+  // memory; see the top-of-file comment on why the tap is no longer the
+  // library's only entrance). Requested explicitly rather than relying on
   // `launchImageLibraryAsync`'s own implicit prompt-on-first-call, to match
   // this app's existing habit of asking for permission with its own,
   // legible call site (see src/notifications/permissions.ts) rather than
   // letting a native API surface a system dialog with no app-level context
   // around it.
-  const onCameraLongPress = () => {
+  const openPhotoLibrary = () => {
     void (async () => {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        // No screen for this (unlike CameraCapture's denied state) — a
-        // long-press that silently does nothing is a reasonable outcome
-        // for the COLD path; the user can grant access from Settings and
-        // long-press again. Escalating this into a modal/alert would be
-        // more chrome than the cold path is worth.
+        // No screen for this (unlike CameraCapture's denied state) — a tap
+        // that silently does nothing is a reasonable outcome here; the
+        // user can grant access from Settings and tap again. Escalating
+        // this into a modal/alert would be more chrome than a denied
+        // library permission is worth.
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -278,6 +323,7 @@ export function CaptureBar() {
         addAgentPending(result.id);
         setText("");
         setReplyingTo(null);
+        setSendCount((n) => n + 1);
       },
       onError: (error) => {
         // A thought must never go missing because the network dropped:
@@ -381,7 +427,7 @@ export function CaptureBar() {
           composer below can now grow to ~4.5 lines. The 72px mic is the
           tallest thing in this row (see the top-of-file comment) and stays
           that way for the first ~3 grown lines (24px each) — through that
-          whole common range, `items-center` is what keeps the keyboard key,
+          whole common range, `items-center` is what keeps the library key,
           camera key, mic and single-line placeholder text sharing one
           visual centerline, same as before this fix. `items-end` only wins
           once the input outgrows the mic (the last ~1.5 lines of its
@@ -390,26 +436,31 @@ export function CaptureBar() {
           is the overwhelmingly common case per this file's own "the mic is
           the default input" framing — a worse trade. */}
       <View className="flex-row items-center gap-[14px]">
+        {/* 48px, spends the slot the keyboard key used to occupy (see the
+            top-of-file comment's operator ruling) — tapping the composer
+            already focuses it, so this key is better spent opening the
+            library directly, which used to be reachable only by
+            long-pressing the camera key with no visible affordance. */}
         <Pressable
-          accessibilityLabel="Open keyboard"
+          accessibilityLabel="Choose a photo"
           accessibilityRole="button"
           className="h-touch w-touch items-center justify-center rounded-sm border border-line-strong active:opacity-80"
-          onPress={() => inputRef.current?.focus()}
+          onPress={openPhotoLibrary}
         >
-          <KeyboardIcon color={palette.ink.DEFAULT} size={20} />
+          <Images color={palette.ink.DEFAULT} size={20} />
         </Pressable>
 
         {/* 56px, deliberately smaller than the 72px mic — "the camera never
             competes for the thumb" (Step 11's capture rules). Tap opens the
             hot path (CameraCapture, no menu in between); long-press opens
-            the library instead — "cold path, picker allowed... never the
-            default tap." */}
+            the library too, same as the dedicated library key to the left —
+            kept for muscle memory, never the only way in. */}
         <Pressable
           accessibilityHint="Long-press to choose a photo from your library"
           accessibilityLabel="Camera"
           accessibilityRole="button"
           className="h-camera w-camera items-center justify-center rounded-sm border border-line-strong active:opacity-80"
-          onLongPress={onCameraLongPress}
+          onLongPress={openPhotoLibrary}
           onPress={() => setCameraOpen(true)}
         >
           <CameraIcon color={palette.ink.DEFAULT} size={22} />
