@@ -7,7 +7,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { formatApiError, getStatus, resetClient } from "../api/client";
 import type { Status } from "../api/types";
@@ -24,7 +23,7 @@ import {
   useAuth,
   type ThemePreference,
 } from "../store/useAuth";
-import { colors, nightPalette } from "../theme/colors";
+import { useTheme } from "../theme/useTheme";
 
 type ConnectionState =
   | { kind: "idle" }
@@ -35,6 +34,7 @@ type ConnectionState =
 const THEME_OPTIONS: ThemePreference[] = ["night", "day", "system"];
 
 export function SettingsScreen() {
+  const { palette } = useTheme();
   const baseUrl = useAuth((s) => s.baseUrl);
   const userId = useAuth((s) => s.userId);
   const theme = useAuth((s) => s.theme);
@@ -158,16 +158,24 @@ export function SettingsScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-cream" edges={["top"]}>
+    // A plain View, not a `SafeAreaView edges={["top"]}`. This screen has not
+    // been the top edge since it stopped being a tab-bar route: App.tsx
+    // presents it in a Modal underneath its own header bar, and that bar is
+    // what sits against the status bar now and claims the inset. Claiming it
+    // here too put a status-bar-height gap in the middle of the screen.
+    <View className="flex-1 bg-bg-raised">
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-4 pb-8 pt-4"
         keyboardShouldPersistTaps="handled"
       >
-        <Text className="text-base font-semibold leading-6 text-olive">
-          Settings
-        </Text>
-        <Text className="mt-1 text-base leading-6 text-terracotta">
+        {/* No "Settings" heading here — App.tsx's modal header bar already
+            says it, directly above. This screen carried its own title from
+            its tab-bar days, and while the two were different sizes it read
+            as a heading over a section; on the real type scale they are the
+            same 20px semibold and it just looks like the word printed
+            twice. */}
+        <Text className="font-sans text-body text-clay">
           Connect this phone to your Fennoc API over Tailscale.
         </Text>
 
@@ -175,10 +183,10 @@ export function SettingsScreen() {
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
-          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          className="min-h-touch rounded-lg border border-bg-base bg-bg-overlay px-3 font-sans text-body text-ink"
           onChangeText={setUrlDraft}
           placeholder="https://host.tailnet.ts.net:8643"
-          placeholderTextColor={nightPalette.ink.muted}
+          placeholderTextColor={palette.ink.muted}
           value={urlDraft}
         />
 
@@ -186,10 +194,10 @@ export function SettingsScreen() {
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
-          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          className="min-h-touch rounded-lg border border-bg-base bg-bg-overlay px-3 font-sans text-body text-ink"
           onChangeText={setApiKeyDraft}
           placeholder={keyLoaded ? "Bearer token" : "Loading…"}
-          placeholderTextColor={nightPalette.ink.muted}
+          placeholderTextColor={palette.ink.muted}
           secureTextEntry
           value={apiKeyDraft}
         />
@@ -198,46 +206,46 @@ export function SettingsScreen() {
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
-          className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+          className="min-h-touch rounded-lg border border-bg-base bg-bg-overlay px-3 font-sans text-body text-ink"
           onChangeText={setUserDraft}
           placeholder="vince"
-          placeholderTextColor={nightPalette.ink.muted}
+          placeholderTextColor={palette.ink.muted}
           value={userDraft}
         />
 
         <Pressable
           accessibilityRole="button"
-          className="mt-6 min-h-12 items-center justify-center rounded-lg bg-terracotta px-4 active:opacity-80"
+          className="mt-6 min-h-touch items-center justify-center rounded-lg bg-clay px-4 active:opacity-80"
           disabled={connection.kind === "loading"}
           onPress={onTestConnection}
         >
           {connection.kind === "loading" ? (
-            <ActivityIndicator color={colors.cream} />
+            <ActivityIndicator color={palette.bg.raised} />
           ) : (
-            <Text className="text-base font-semibold leading-6 text-cream">
+            <Text className="font-sans-semibold text-label text-bg-raised">
               Test Connection
             </Text>
           )}
         </Pressable>
 
-        <View className="mt-4 rounded-xl bg-sand p-4">
+        <View className="mt-4 rounded-xl bg-bg-base p-4">
           {connection.kind === "idle" && (
-            <Text className="text-base leading-6 text-olive">
+            <Text className="font-sans text-body text-ink">
               Not tested yet.
             </Text>
           )}
           {connection.kind === "loading" && (
-            <Text className="text-base leading-6 text-olive">Checking…</Text>
+            <Text className="font-sans text-body text-ink">Checking…</Text>
           )}
           {connection.kind === "ok" && (
-            <Text className="text-base leading-6 text-olive">
+            <Text className="font-sans text-body text-ink">
               ✅ Connected — open {connection.status.open} / completed{" "}
               {connection.status.completed} / overdue{" "}
               {connection.status.overdue}
             </Text>
           )}
           {connection.kind === "error" && (
-            <Text className="text-base leading-6 text-olive">
+            <Text className="font-sans text-body text-ink">
               ❌ Failed: {connection.message}
             </Text>
           )}
@@ -251,14 +259,14 @@ export function SettingsScreen() {
               <Pressable
                 key={option}
                 accessibilityRole="button"
-                className={`min-h-12 min-w-12 flex-1 items-center justify-center rounded-lg px-3 ${
-                  active ? "bg-olive" : "bg-sand"
+                className={`min-h-touch min-w-12 flex-1 items-center justify-center rounded-lg px-3 ${
+                  active ? "bg-ink" : "bg-bg-base"
                 }`}
                 onPress={() => setTheme(option)}
               >
                 <Text
-                  className={`text-base font-medium capitalize leading-6 ${
-                    active ? "text-cream" : "text-olive"
+                  className={`font-sans-medium text-label capitalize ${
+                    active ? "text-bg-raised" : "text-ink"
                   }`}
                 >
                   {option}
@@ -283,11 +291,11 @@ export function SettingsScreen() {
           again only once there is a real onboarding path for permission, and
           not on `__DEV__`, which does not mean "internal build".
         */}
-        <View className="mt-8 rounded-xl border border-sand bg-cream p-4">
-          <Text className="text-base font-semibold leading-6 text-olive">
+        <View className="mt-8 rounded-xl border border-bg-base bg-bg-raised p-4">
+          <Text className="font-sans-semibold text-body text-ink">
             Notifications (testing)
           </Text>
-          <Text className="mt-1 text-sm leading-5 text-olive opacity-70">
+          <Text className="mt-1 font-sans text-caption text-ink-secondary">
             Grant permission, then register this device so Fennoc can reach it.
             The per-channel buttons fire local test pings to check importance,
             sound, and action set.
@@ -295,20 +303,20 @@ export function SettingsScreen() {
 
           <Pressable
             accessibilityRole="button"
-            className="mt-4 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+            className="mt-4 min-h-touch items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
             onPress={onRequestDevPermission}
           >
-            <Text className="text-base font-semibold leading-6 text-signal-on">
+            <Text className="font-sans-semibold text-label text-signal-on">
               Enable notifications
             </Text>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            className="mt-3 min-h-12 items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
+            className="mt-3 min-h-touch items-center justify-center rounded-lg bg-signal px-4 active:opacity-80"
             onPress={onRegisterDevice}
           >
-            <Text className="text-base font-semibold leading-6 text-signal-on">
+            <Text className="font-sans-semibold text-label text-signal-on">
               Register this device
             </Text>
           </Pressable>
@@ -318,10 +326,10 @@ export function SettingsScreen() {
               <Pressable
                 key={channelId}
                 accessibilityRole="button"
-                className="min-h-12 min-w-24 flex-1 items-center justify-center rounded-lg bg-olive px-3 active:opacity-80"
+                className="min-h-touch min-w-24 flex-1 items-center justify-center rounded-lg bg-ink px-3 active:opacity-80"
                 onPress={onFireDevNotification(channelId)}
               >
-                <Text className="text-base font-medium capitalize leading-6 text-cream">
+                <Text className="font-sans-medium text-label capitalize text-bg-raised">
                   {channelId}
                 </Text>
               </Pressable>
@@ -329,19 +337,19 @@ export function SettingsScreen() {
           </View>
 
           {devNotifStatus ? (
-            <Text className="mt-3 text-sm leading-5 text-olive">
+            <Text className="mt-3 font-sans text-caption text-ink">
               {devNotifStatus}
             </Text>
           ) : null}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function FieldLabel({ label }: { label: string }) {
   return (
-    <Text className="mb-2 mt-5 text-base font-medium leading-6 text-olive">
+    <Text className="mb-2 mt-5 font-sans-medium text-label text-ink">
       {label}
     </Text>
   );

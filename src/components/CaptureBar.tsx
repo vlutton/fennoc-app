@@ -8,6 +8,7 @@ import {
   Pressable,
   Text,
   TextInput,
+  type TextInputContentSizeChangeEvent,
   View,
 } from "react-native";
 
@@ -20,6 +21,17 @@ import { useTheme } from "../theme/useTheme";
 import { CameraCapture } from "./CameraCapture";
 
 type Feedback = "captured" | "queued" | "error" | null;
+
+// Matches `text-body`'s lineHeight in tailwind.config.js (16px/24px). The
+// composer starts at exactly one line — its original, single-line height —
+// and is allowed to grow up to roughly 4.5 lines (the ".5" is deliberate: a
+// partial line peeking at the cap is what tells the eye "there's more, this
+// scrolls" instead of the box just silently stopping). Past that it scrolls
+// internally rather than pushing the mic/camera buttons or the rest of the
+// bar around.
+const COMPOSER_LINE_HEIGHT = 24;
+const COMPOSER_MIN_HEIGHT = COMPOSER_LINE_HEIGHT;
+const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
 
 /**
  * `bg.float`, 1px top border `line.strong`, padding 14/16, gap 14. The
@@ -59,6 +71,15 @@ type Feedback = "captured" | "queued" | "error" | null;
 export function CaptureBar() {
   const { palette } = useTheme();
   const [text, setText] = useState("");
+  // Auto-growing composer height. `style` (not `className`) on purpose:
+  // NativeWind classes are static strings resolved once, and this value
+  // changes on every keystroke — there is no Tailwind utility for "whatever
+  // height the content just measured at". `onContentSizeChange` reports the
+  // TextInput's actual content height as the user types; clamping it here
+  // is what turns that into "starts at one line, grows, caps at ~4.5 lines
+  // and scrolls" instead of an unbounded box that could swallow the rest of
+  // the screen on a long brain-dump.
+  const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,6 +108,20 @@ export function CaptureBar() {
       if (clearTimer.current) clearTimeout(clearTimer.current);
     };
   }, []);
+
+  // Collapse the composer back to one line whenever it empties. This is
+  // belt-and-braces on top of `onContentSizeChange`, and it is here because
+  // every clear in this component is PROGRAMMATIC — `setText("")` after a
+  // send, a photo send, or an offline fallback — never a keystroke. Android
+  // does not reliably re-measure a multiline TextInput whose value was
+  // replaced from JS, so relying on the measurement callback alone risks a
+  // composer that stays four lines tall over a placeholder after every send.
+  // Resetting on the state that actually changed is cheaper than trying to
+  // remember to reset at all three call sites, and cannot be forgotten at a
+  // fourth.
+  useEffect(() => {
+    if (text === "") setInputHeight(COMPOSER_MIN_HEIGHT);
+  }, [text]);
 
   // Focus the composer the moment `replyingTo` transitions from null to
   // non-null (i.e. a Reply CTA was just pressed elsewhere in the tree).
@@ -205,6 +240,11 @@ export function CaptureBar() {
       setReplyingTo(null);
       inputRef.current?.focus();
     })();
+  };
+
+  const onComposerContentSizeChange = (event: TextInputContentSizeChangeEvent) => {
+    const measured = event.nativeEvent.contentSize.height;
+    setInputHeight(Math.min(Math.max(measured, COMPOSER_MIN_HEIGHT), COMPOSER_MAX_HEIGHT));
   };
 
   const onSubmit = () => {
@@ -337,6 +377,18 @@ export function CaptureBar() {
         </View>
       ) : null}
 
+      {/* Deliberately still `items-center`, not `items-end`, even though the
+          composer below can now grow to ~4.5 lines. The 72px mic is the
+          tallest thing in this row (see the top-of-file comment) and stays
+          that way for the first ~3 grown lines (24px each) — through that
+          whole common range, `items-center` is what keeps the keyboard key,
+          camera key, mic and single-line placeholder text sharing one
+          visual centerline, same as before this fix. `items-end` only wins
+          once the input outgrows the mic (the last ~1.5 lines of its
+          range), and switching to it globally would misalign the 48px/56px
+          keys against the mic for every rest state and short entry, which
+          is the overwhelmingly common case per this file's own "the mic is
+          the default input" framing — a worse trade. */}
       <View className="flex-row items-center gap-[14px]">
         <Pressable
           accessibilityLabel="Open keyboard"
@@ -368,12 +420,27 @@ export function CaptureBar() {
           autoCorrect
           className="flex-1 font-sans text-body text-ink"
           editable={!pending}
+          multiline
           onChangeText={setText}
-          onSubmitEditing={onSubmit}
+          onContentSizeChange={onComposerContentSizeChange}
           placeholder={pendingImage ? "Say what it is (optional)" : "Say anything"}
           placeholderTextColor={palette.ink.muted}
           ref={inputRef}
-          returnKeyType="send"
+          // No `returnKeyType="send"` / `onSubmitEditing` here — deliberately.
+          // With `multiline`, Android inserts a newline on Enter regardless
+          // of `returnKeyType`, so a "send" label on that key would lie
+          // about what pressing it does, and `onSubmitEditing` is
+          // unreliable enough under multiline (esp. on Android, where it
+          // effectively never fires) that wiring it to `onSubmit` would be
+          // dead code dressed up as a feature. `submitBehavior="newline"` is
+          // multiline's own default — set explicitly so this reads as a
+          // decision, not an oversight. The send affordance is entirely the
+          // mic/arrow button below (`onMicPress`, which already calls
+          // `onSubmit`); losing Enter-to-send is an acceptable trade for a
+          // field that needs to show a multi-sentence entry.
+          submitBehavior="newline"
+          style={{ height: inputHeight }}
+          textAlignVertical="top"
           value={text}
         />
 

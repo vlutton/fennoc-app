@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import type { OpenTimer } from "../api/types";
-import { colors, nightPalette } from "../theme/colors";
+import { useTheme } from "../theme/useTheme";
 import { formatClock } from "../utils/format";
 
 export const TIME_CATEGORIES = [
@@ -43,6 +43,7 @@ export function TimerCard({
   starting = false,
   stopping = false,
 }: TimerCardProps) {
+  const { palette } = useTheme();
   const [category, setCategory] = useState<TimeCategory>("work");
   const [label, setLabel] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -75,7 +76,7 @@ export function TimerCard({
           onPress={onStop}
         >
           {pending ? (
-            <ActivityIndicator color={colors.cream} />
+            <ActivityIndicator color={palette.bg.raised} />
           ) : (
             <Text className="text-base font-semibold leading-6 text-cream">
               STOP
@@ -126,13 +127,21 @@ export function TimerCard({
       <Text className="mb-2 mt-4 text-base font-medium leading-6 text-olive">
         Label (optional)
       </Text>
+      {/* This input was `bg-white ... text-olive` — the same pair that made
+          every Settings field unreadable. `bg-white` is a hardcoded colour
+          that never themes, and `olive` now aliases to ink.DEFAULT, which is
+          near-white. Fixed at the same time as Settings because it is the
+          same defect, not a similar one: an input whose contents you cannot
+          see is an input you type over. The rest of this card still uses the
+          transitional aliases, which do theme correctly — only the hardcoded
+          white was harmful. */}
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
-        className="min-h-12 rounded-lg border border-sand bg-white px-3 text-base leading-6 text-olive"
+        className="min-h-touch rounded-lg border border-bg-base bg-bg-overlay px-3 font-sans text-body text-ink"
         onChangeText={setLabel}
         placeholder="coding"
-        placeholderTextColor={nightPalette.ink.muted}
+        placeholderTextColor={palette.ink.muted}
         value={label}
       />
 
@@ -148,7 +157,7 @@ export function TimerCard({
         }
       >
         {pending ? (
-          <ActivityIndicator color={colors.cream} />
+          <ActivityIndicator color={palette.bg.raised} />
         ) : (
           <Text className="text-base font-semibold leading-6 text-cream">
             START

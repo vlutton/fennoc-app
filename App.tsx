@@ -7,7 +7,11 @@ import { StatusBar } from "expo-status-bar";
 import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
 import { useOutboxBootstrap } from "./src/hooks/useOutboxBootstrap";
 import { initNotifications } from "./src/notifications";
@@ -48,20 +52,44 @@ function Root() {
         onRequestClose={() => setSettingsOpen(false)}
         visible={settingsOpen}
       >
-        <View className="h-16 flex-row items-center justify-between border-b border-line-hairline bg-bg-base px-4">
-          <Text className="font-sans-semibold text-heading text-ink">
-            Settings
-          </Text>
-          <Pressable
-            accessibilityLabel="Close settings"
-            accessibilityRole="button"
-            className="h-touch w-touch items-center justify-center"
-            onPress={() => setSettingsOpen(false)}
-          >
-            <X color={palette.ink.DEFAULT} size={24} />
-          </Pressable>
-        </View>
-        <SettingsScreen />
+        {/* `react-native-safe-area-context`'s app-root `SafeAreaProvider`
+            (above, wrapping `<Root />`) does not reach in here — a `Modal`
+            renders into its own native root, so any `SafeAreaView` inside
+            resolves to a 0 inset and draws under the status bar/clock. Same
+            trap, same fix, as `ReplySheet.tsx` / `CameraCapture.tsx`: nest a
+            SEPARATE `SafeAreaProvider`, seeded with `initialWindowMetrics`
+            so the first frame isn't a 0-inset flash while the real
+            measurement comes in.
+
+            THIS bar is what takes the top inset, not `SettingsScreen`. It is
+            the topmost element inside the Modal, so it is the one the
+            operator saw overlapping the clock. `SettingsScreen` used to own
+            the screen's top edge — back when it was a tab-bar route, before
+            it gained this header (see the note above `Root`) — and it kept
+            an `edges={["top"]}` that has been describing a layout that no
+            longer exists. Left in place it would have inserted a phantom
+            status-bar-height gap BELOW this bar while the bar itself stayed
+            under the clock: the reported bug, plus a new one. Its root is a
+            plain `View` now, and the inset is claimed here, once, by the
+            element actually at the top. */}
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <SafeAreaView className="bg-bg-base" edges={["top"]}>
+            <View className="h-16 flex-row items-center justify-between border-b border-line-hairline px-4">
+              <Text className="font-sans-semibold text-heading text-ink">
+                Settings
+              </Text>
+              <Pressable
+                accessibilityLabel="Close settings"
+                accessibilityRole="button"
+                className="h-touch w-touch items-center justify-center"
+                onPress={() => setSettingsOpen(false)}
+              >
+                <X color={palette.ink.DEFAULT} size={24} />
+              </Pressable>
+            </View>
+          </SafeAreaView>
+          <SettingsScreen />
+        </SafeAreaProvider>
       </Modal>
     </View>
   );
