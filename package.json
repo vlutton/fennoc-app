@@ -10,11 +10,14 @@
     "axios": "^1.18.1",
     "babel-preset-expo": "~57.0.0",
     "expo": "~57.0.8",
+    "expo-camera": "~57.0.3",
     "expo-crypto": "~57.0.1",
     "expo-dev-client": "~57.0.9",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.1",
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.1",
+    "expo-image-picker": "~57.0.7",
     "expo-network": "~57.0.1",
     "expo-notifications": "~57.0.7",
     "expo-secure-store": "~57.0.1",
@@ -35,16 +38,20 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.1",
+    "eslint-plugin-tailwindcss": "^3.18.3",
     "sharp": "^0.35.3",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "lint": "eslint .",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "gen:api-schema": "curl -sf http://127.0.0.1:8644/openapi.json -o src/api/openapi.schema.json && node -e \"JSON.parse(require('fs').readFileSync('src/api/openapi.schema.json','utf8'))\" && echo 'wrote src/api/openapi.schema.json from http://127.0.0.1:8644'",
+    "gen:api-schema": "curl -sf http://127.0.0.1:8643/openapi.json -o src/api/openapi.schema.json && node -e \"JSON.parse(require('fs').readFileSync('src/api/openapi.schema.json','utf8'))\" && echo 'wrote src/api/openapi.schema.json from http://127.0.0.1:8643'",
     "gen:api-types": "npx -y openapi-typescript@7 src/api/openapi.schema.json -o src/api/schema.gen.ts"
   },
   "private": true

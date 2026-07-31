@@ -118,6 +118,10 @@ module.exports = {
       spacing: {
         1: '4px', 2: '8px', 3: '12px', 4: '16px', 6: '24px', 8: '32px', 12: '48px', 16: '64px',
         touch: '48px', mic: '72px', strip: '28px',
+        // "Camera key is 56px, mic stays 72px" (Step 11 capture rules) — a
+        // deliberately smaller target than the mic so the camera never reads
+        // as competing with voice for the thumb's resting position.
+        camera: '56px',
       },
       borderRadius: { sm: '8px', md: '12px', lg: '20px', sheet: '28px', full: '999px' },
       boxShadow: {

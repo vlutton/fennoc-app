@@ -40,6 +40,20 @@ export type AgentMessageCreated = components["schemas"]["AgentMessageCreatedResp
 /** GET /api/message/{id} and /api/messages — full `agent_messages` row (INT-029b). */
 export type AgentMessage = components["schemas"]["AgentMessageResponse"];
 
+/** POST /api/push/register — echoes back the upserted `device_tokens` row. */
+export type PushRegisterResult = components["schemas"]["PushRegisterResponse"];
+
+/**
+ * POST /api/image — the one-pass vision read (INT capture hot path, Step 11
+ * of the design handoff). `id` is the stored row's identifier — useful for a
+ * later `fennoc_recall_image` follow-up question, not for re-fetching the
+ * photo, since fennoc-core discards the image bytes before this response is
+ * even returned (see `api/server.py`'s `upload_image_endpoint` docstring).
+ * There is no client-side "view full size" affordance anywhere in this app
+ * for exactly that reason: there is nothing left on the server to view.
+ */
+export type ImageUploadResult = components["schemas"]["ImageUploadResponse"];
+
 // ---------------------------------------------------------------------------
 // Hand-written types below.
 //

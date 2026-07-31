@@ -43,3 +43,9 @@ yarn-error.*
 # Downloaded Expo Go client (208MB) — never commit
 Expo-Go-*.apk
 *.apk
+
+# Firebase Android config. Google documents this as non-secret (it ships
+# inside every APK and its API key is restricted to the package + signing
+# cert), but this repo is PUBLIC, so it stays out until we decide otherwise.
+# EAS builds need it — see the note in app.json.
+google-services.json

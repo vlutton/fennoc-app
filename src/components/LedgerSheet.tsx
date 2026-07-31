@@ -12,8 +12,19 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import Animated, {
+  Easing,
+  runOnJS,
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { useTheme } from "../theme/useTheme";
 import { LedgerBriefingsSection } from "./LedgerBriefingsSection";
@@ -75,21 +86,25 @@ const DISMISS_MS = 220;
  * open, which is what actually satisfies "filter persistence: none" — there
  * is no stale state to explicitly clear, because there is no state left to
  * find.
+ *
+ * Split into this thin shell (owns the Modal + rise/dismiss animation
+ * state) and `LedgerSheetContent` (owns everything else, including reading
+ * insets) for the same reason `ReplySheet.tsx` / `BriefingSheet.tsx` are
+ * split: `react-native-safe-area-context`'s app-root `SafeAreaProvider`
+ * does not propagate through an RN `Modal` on Android (separate native
+ * root), so `useSafeAreaInsets()` below needs its OWN, nested
+ * `SafeAreaProvider` — and that provider can only supply insets to
+ * components rendered as ITS children, not to the component that renders
+ * it. Seeded with `initialWindowMetrics` so the first frame isn't a
+ * 0-inset flash while the real measurement comes in.
  */
 export function LedgerSheet({ visible, onClose }: LedgerSheetProps) {
-  const { palette } = useTheme();
-  const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
 
   const [modalVisible, setModalVisible] = useState(visible);
-  const [query, setQuery] = useState("");
-  const [activeSection, setActiveSection] = useState<SectionId>("tasks");
 
   const translateY = useSharedValue(windowHeight);
   const scrimOpacity = useSharedValue(0);
-
-  const scrollRef = useRef<ScrollView>(null);
-  const sectionOffsets = useRef<Partial<Record<SectionId, number>>>({});
 
   useEffect(() => {
     if (visible) {
@@ -104,9 +119,49 @@ export function LedgerSheet({ visible, onClose }: LedgerSheetProps) {
     }
   }, [visible, windowHeight, translateY, scrimOpacity]);
 
+  if (!modalVisible) return null;
+
+  return (
+    <Modal animationType="none" onRequestClose={onClose} transparent visible={modalVisible}>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <LedgerSheetContent
+          onClose={onClose}
+          scrimOpacity={scrimOpacity}
+          translateY={translateY}
+          visible={visible}
+          windowHeight={windowHeight}
+        />
+      </SafeAreaProvider>
+    </Modal>
+  );
+}
+
+function LedgerSheetContent({
+  visible,
+  onClose,
+  translateY,
+  scrimOpacity,
+  windowHeight,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  translateY: SharedValue<number>;
+  scrimOpacity: SharedValue<number>;
+  windowHeight: number;
+}) {
+  const { palette } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const [query, setQuery] = useState("");
+  const [activeSection, setActiveSection] = useState<SectionId>("tasks");
+
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Partial<Record<SectionId, number>>>({});
+
   // Reset search/section/offsets at the moment of opening, in addition to
-  // the unmount-on-close above — belt and suspenders against the search bar
-  // ever showing a leftover query for one frame before the subtree remounts.
+  // the unmount-on-close in the parent — belt and suspenders against the
+  // search bar ever showing a leftover query for one frame before the
+  // subtree remounts.
   useEffect(() => {
     if (visible) {
       setQuery("");
@@ -120,8 +175,6 @@ export function LedgerSheet({ visible, onClose }: LedgerSheetProps) {
 
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimOpacity.value }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
-
-  if (!modalVisible) return null;
 
   const onSectionLayout = (id: SectionId) => (event: { nativeEvent: { layout: { y: number } } }) => {
     sectionOffsets.current[id] = event.nativeEvent.layout.y;
@@ -149,137 +202,135 @@ export function LedgerSheet({ visible, onClose }: LedgerSheetProps) {
   const searching = query.trim().length > 0;
 
   return (
-    <Modal animationType="none" onRequestClose={onClose} transparent visible={modalVisible}>
-      <View className="flex-1">
-        {/* Scrim. Its 62% dimming comes from the animated `opacity` style,
-            not a color token, so this stays a plain `bg-bg-base` layer —
-            no rgba()/hex literal needed to hit the design's "62% scrim". */}
-        <Animated.View style={[StyleSheet.absoluteFill, scrimStyle]}>
-          <Pressable
-            accessibilityLabel="Close ledger"
-            accessibilityRole="button"
-            className="flex-1 bg-bg-base"
-            onPress={onClose}
-          />
-        </Animated.View>
+    <View className="flex-1">
+      {/* Scrim. Its 62% dimming comes from the animated `opacity` style,
+          not a color token, so this stays a plain `bg-bg-base` layer —
+          no rgba()/hex literal needed to hit the design's "62% scrim". */}
+      <Animated.View style={[StyleSheet.absoluteFill, scrimStyle]}>
+        <Pressable
+          accessibilityLabel="Close ledger"
+          accessibilityRole="button"
+          className="flex-1 bg-bg-base"
+          onPress={onClose}
+        />
+      </Animated.View>
 
-        {/* Animated.View only carries the transform — NativeWind's className
-            doesn't resolve on react-native-reanimated's Animated.View
-            without registering it via cssInterop, so all the visual
-            styling (radius/border/bg/maxHeight) lives on the plain View
-            nested inside it instead. */}
-        <Animated.View style={[styles.sheetPositioner, sheetStyle]}>
-          {/*
-            `height`, not `maxHeight`. maxHeight only caps — it does not size —
-            so the sheet collapsed to its header and the flex-1 ScrollView below
-            got zero height, rendering no sections at all despite live data.
+      {/* Animated.View only carries the transform — NativeWind's className
+          doesn't resolve on react-native-reanimated's Animated.View
+          without registering it via cssInterop, so all the visual
+          styling (radius/border/bg/maxHeight) lives on the plain View
+          nested inside it instead. */}
+      <Animated.View style={[styles.sheetPositioner, sheetStyle]}>
+        {/*
+          `height`, not `maxHeight`. maxHeight only caps — it does not size —
+          so the sheet collapsed to its header and the flex-1 ScrollView below
+          got zero height, rendering no sections at all despite live data.
 
-            The ledger is deliberately the FULL-height sheet: the design has it
-            rise leaving 68px of dimmed thread visible, so its height is the
-            computed frame-minus-chrome value rather than its content. Summoned
-            widget sheets (INT-025) are the ones that size to content and merely
-            cap at this value.
-          */}
-          <View
-            className="rounded-t-sheet border-t border-line-strong bg-bg-overlay"
-            style={{ height: sheetHeight }}
-          >
-            <View className="mt-3 h-1 w-9 self-center rounded-[2px] bg-line-strong" />
+          The ledger is deliberately the FULL-height sheet: the design has it
+          rise leaving 68px of dimmed thread visible, so its height is the
+          computed frame-minus-chrome value rather than its content. Summoned
+          widget sheets (INT-025) are the ones that size to content and merely
+          cap at this value.
+        */}
+        <View
+          className="rounded-t-sheet border-t border-line-strong bg-bg-overlay"
+          style={{ height: sheetHeight }}
+        >
+          <View className="mt-3 h-1 w-9 self-center rounded-[2px] bg-line-strong" />
 
-            <View className="flex-row items-center justify-between px-4 pb-3 pt-3">
-              <Text className="font-sans-semibold text-title text-ink">Ledger</Text>
+          <View className="flex-row items-center justify-between px-4 pb-3 pt-3">
+            <Text className="font-sans-semibold text-title text-ink">Ledger</Text>
+            <Pressable
+              accessibilityLabel="Close"
+              accessibilityRole="button"
+              className="h-touch w-touch items-center justify-center"
+              onPress={onClose}
+            >
+              <X color={palette.ink.DEFAULT} size={22} />
+            </Pressable>
+          </View>
+
+          <View className="px-4 pb-3">
+            <View className="h-12 flex-row items-center gap-2 rounded-sm border border-line-hairline bg-bg-raised px-3">
+              <TextInput
+                accessibilityLabel="Search the ledger"
+                autoCapitalize="none"
+                autoCorrect={false}
+                className="flex-1 font-sans text-body text-ink"
+                onChangeText={setQuery}
+                placeholder="Find anything"
+                placeholderTextColor={palette.ink.muted}
+                value={query}
+              />
               <Pressable
-                accessibilityLabel="Close"
+                accessibilityLabel="Search by voice"
                 accessibilityRole="button"
-                className="h-touch w-touch items-center justify-center"
-                onPress={onClose}
+                className="h-9 w-9 items-center justify-center rounded-full border border-line-strong active:opacity-80"
+                // Visual size is 36×36 per spec; hitSlop brings the real
+                // touch target to 48×48 without changing how it looks —
+                // same fix StatusStrip already uses for its budget marks.
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                onPress={() => {
+                  // TODO(INT-025): voice capture (listening/thinking/
+                  // transcription) isn't built yet — see CaptureBar's
+                  // identical no-op mic path. Inert, not a fake "listening"
+                  // state with no transcription behind it.
+                }}
               >
-                <X color={palette.ink.DEFAULT} size={22} />
+                <Mic color={palette.ink.muted} size={16} />
               </Pressable>
             </View>
-
-            <View className="px-4 pb-3">
-              <View className="h-12 flex-row items-center gap-2 rounded-sm border border-line-hairline bg-bg-raised px-3">
-                <TextInput
-                  accessibilityLabel="Search the ledger"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="flex-1 font-sans text-body text-ink"
-                  onChangeText={setQuery}
-                  placeholder="Find anything"
-                  placeholderTextColor={palette.ink.muted}
-                  value={query}
-                />
-                <Pressable
-                  accessibilityLabel="Search by voice"
-                  accessibilityRole="button"
-                  className="h-9 w-9 items-center justify-center rounded-full border border-line-strong active:opacity-80"
-                  // Visual size is 36×36 per spec; hitSlop brings the real
-                  // touch target to 48×48 without changing how it looks —
-                  // same fix StatusStrip already uses for its budget marks.
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  onPress={() => {
-                    // TODO(INT-025): voice capture (listening/thinking/
-                    // transcription) isn't built yet — see CaptureBar's
-                    // identical no-op mic path. Inert, not a fake "listening"
-                    // state with no transcription behind it.
-                  }}
-                >
-                  <Mic color={palette.ink.muted} size={16} />
-                </Pressable>
-              </View>
-            </View>
-
-            {!searching ? (
-              <View className="flex-row gap-2 px-4 pb-3">
-                {SECTIONS.map((section) => {
-                  const active = activeSection === section.id;
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      className={`h-touch items-center justify-center rounded-full border px-5 ${
-                        active ? "border-ink bg-ink" : "border-line-strong bg-transparent"
-                      }`}
-                      key={section.id}
-                      onPress={() => onPressSection(section.id)}
-                    >
-                      <Text className={`font-sans-medium text-label ${active ? "text-bg-base" : "text-ink"}`}>
-                        {section.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-
-            <ScrollView
-              className="flex-1 min-h-0"
-              contentContainerClassName="px-4 pb-8"
-              onScroll={searching ? undefined : onScroll}
-              ref={scrollRef}
-              scrollEventThrottle={100}
-            >
-              {searching ? (
-                <LedgerSearchResults query={query} />
-              ) : (
-                <>
-                  <View className="mb-6" onLayout={onSectionLayout("tasks")}>
-                    <LedgerTasksSection />
-                  </View>
-                  <View className="mb-6" onLayout={onSectionLayout("time")}>
-                    <LedgerTimeSection />
-                  </View>
-                  <View onLayout={onSectionLayout("briefings")}>
-                    <LedgerBriefingsSection />
-                  </View>
-                </>
-              )}
-            </ScrollView>
           </View>
-        </Animated.View>
-      </View>
-    </Modal>
+
+          {!searching ? (
+            <View className="flex-row gap-2 px-4 pb-3">
+              {SECTIONS.map((section) => {
+                const active = activeSection === section.id;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    className={`h-touch items-center justify-center rounded-full border px-5 ${
+                      active ? "border-ink bg-ink" : "border-line-strong bg-transparent"
+                    }`}
+                    key={section.id}
+                    onPress={() => onPressSection(section.id)}
+                  >
+                    <Text className={`font-sans-medium text-label ${active ? "text-bg-base" : "text-ink"}`}>
+                      {section.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <ScrollView
+            className="flex-1 min-h-0"
+            contentContainerClassName="px-4 pb-8"
+            onScroll={searching ? undefined : onScroll}
+            ref={scrollRef}
+            scrollEventThrottle={100}
+          >
+            {searching ? (
+              <LedgerSearchResults query={query} />
+            ) : (
+              <>
+                <View className="mb-6" onLayout={onSectionLayout("tasks")}>
+                  <LedgerTasksSection />
+                </View>
+                <View className="mb-6" onLayout={onSectionLayout("time")}>
+                  <LedgerTimeSection />
+                </View>
+                <View onLayout={onSectionLayout("briefings")}>
+                  <LedgerBriefingsSection />
+                </View>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 

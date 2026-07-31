@@ -3,19 +3,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { formatApiError } from "../api/client";
+import { deleteImage, formatApiError } from "../api/client";
 import { BriefingSheet } from "../components/BriefingSheet";
 import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
 import { LedgerSheet } from "../components/LedgerSheet";
 import { NextStrip } from "../components/NextStrip";
+import { PhotoMessage } from "../components/PhotoMessage";
 import { ReplySheet } from "../components/ReplySheet";
 import { StatusStrip } from "../components/StatusStrip";
 import { useAgentMessagePoll } from "../hooks/useAgentMessage";
 import { useEveningBriefing, useMorningBriefing } from "../hooks/useBriefing";
 import { usePendingCheckin, useReplyCheckin } from "../hooks/useHome";
-import { useThreadStore, useTodayCaptures } from "../store/useThread";
+import { cancelHeldUploadsForBatch } from "../outbox";
+import { type PhotoBatch, useThreadStore, useTodayCaptures } from "../store/useThread";
 import { formatTimeOfDay } from "../utils/format";
 import { useTheme } from "../theme/useTheme";
 import { chicagoToday } from "../utils/format";
@@ -47,6 +49,7 @@ type ThreadMessage =
     }
   | { id: string; kind: "fennoc-line"; atMs: number; stamp: string; text: string }
   | { id: string; kind: "user-capture"; atMs: number; text: string }
+  | { id: string; kind: "photo-batch"; atMs: number; stamp: string; batch: PhotoBatch }
   | {
       id: string;
       kind: "agent-turn";
@@ -231,6 +234,43 @@ function quoteFor(fullText: string): string {
   return flat;
 }
 
+/**
+ * The server-side half of photo Undo for shots that had ALREADY finished
+ * uploading by the time Undo was tapped (`shot.state === "done"`, with a
+ * server-assigned `imageId`) — the counterpart to `cancelHeldUploadsForBatch`
+ * (src/outbox) for the held/offline case. Fires `DELETE /api/image/{id}`
+ * for every such shot in the batch; a "held" or "uploading" shot has no
+ * `imageId` yet and is skipped here (it's `cancelHeldUploadsForBatch`'s or
+ * nothing's job, respectively).
+ *
+ * Deliberately not awaited by the caller (`onUndoPhoto`, above): the
+ * message has already been hidden from the thread by `undoPhotoBatch` by
+ * the time this runs, and there is no "undo the undo" if the network call
+ * fails — the message must not reappear, and Step 11 defines no "delete
+ * failed, retry?" affordance to hold it open for. The delete is genuinely
+ * best-effort from the UI's perspective: the message disappears either
+ * way. What must NOT happen is the failure vanishing silently — a failed
+ * server-side delete means the extracted-text row is still sitting there
+ * even though the user was just shown "gone," so every rejection is logged
+ * loudly via `console.error`. There is no UI surface left to attach a
+ * warning to once the message is hidden (the whole point of Undo is that
+ * it disappears), so a log line — not new UI chrome the spec doesn't call
+ * for — is the honest ceiling here; a future retry-on-next-launch sweep
+ * would be the real fix, not something this handler can do alone.
+ */
+function deleteSentUploadsForBatch(batch: PhotoBatch): void {
+  for (const shot of batch.shots) {
+    if (shot.state !== "done" || !shot.imageId) continue;
+    deleteImage(shot.imageId).catch((error: unknown) => {
+      console.error(
+        "[thread] Undo: server-side image delete failed — the extracted-text row may still exist",
+        shot.imageId,
+        formatApiError(error),
+      );
+    });
+  }
+}
+
 function ThreadTerminus() {
   return (
     <View className="flex-row items-center gap-3">
@@ -267,6 +307,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   const addCapture = useThreadStore((s) => s.addCapture);
   const addFennocLine = useThreadStore((s) => s.addFennocLine);
   const setReplyingTo = useThreadStore((s) => s.setReplyingTo);
+  const undoPhotoBatch = useThreadStore((s) => s.undoPhotoBatch);
   const pendingQuery = usePendingCheckin();
   const replyMutation = useReplyCheckin();
 
@@ -297,6 +338,21 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     }
     for (const capture of captures) {
       const atMs = new Date(capture.createdAt).getTime();
+      // Checked ahead of the agent-turn branch below: a photo entry is
+      // also `speaker === "fennoc"` but carries `photo`, not `agent` — the
+      // two are mutually exclusive per capture (see ThreadCapture), so
+      // order between these two `if`s doesn't matter in practice, but
+      // photo is checked first since it's the newer, narrower case.
+      if (capture.photo) {
+        list.push({
+          id: capture.id,
+          kind: "photo-batch",
+          atMs,
+          stamp: formatTimeOfDay(capture.createdAt),
+          batch: capture.photo,
+        });
+        continue;
+      }
       if (capture.speaker === "fennoc" && capture.agent) {
         list.push({
           id: capture.id,
@@ -382,6 +438,30 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
     setReplyingTo({ messageId, quote });
   };
 
+  // Undo (Step 11: "Undo lives on the sent message for 10s"). Three steps,
+  // in order, once the window is confirmed still open: hide the message
+  // (`undoPhotoBatch` — store-only, returns whether the window was actually
+  // still open), cancel any of its shots that are still sitting unsent in
+  // the outbox (`cancelHeldUploadsForBatch` — the held/offline case: the
+  // outbox item is dropped and the local file deleted, a genuine cancel),
+  // and — the case this used to lie about — tell the server to delete the
+  // row for every shot that had ALREADY finished uploading
+  // (`deleteSentUploadsForBatch`, below). `POST /api/image` never keeps the
+  // bytes, but the extracted-text row it inserts survives the request; for
+  // an already-sent shot, hiding the message without this call meant the
+  // user believed the photo's content was gone when it was still sitting
+  // in the images table. Split across two modules (this component +
+  // outbox) on purpose: useThread.ts can't import the outbox without
+  // creating a cycle (the outbox already imports FROM useThread.ts, to
+  // deliver upload results) — this component is the one place both sides,
+  // plus the API client, are already in scope to call in sequence.
+  const onUndoPhoto = (batch: PhotoBatch) => {
+    if (undoPhotoBatch(batch.batchId)) {
+      cancelHeldUploadsForBatch(batch.batchId);
+      deleteSentUploadsForBatch(batch);
+    }
+  };
+
   const onCheckinReply = (text: string) => {
     const questionType = pendingQuery.data?.question_type;
     if (!questionType) return;
@@ -462,6 +542,16 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
                 key={message.id}
                 label={message.label}
                 onOpen={() => setOpenBriefing({ title: message.title, text: message.text })}
+                stamp={message.stamp}
+              />
+            );
+          }
+          if (message.kind === "photo-batch") {
+            return (
+              <PhotoMessage
+                batch={message.batch}
+                key={message.id}
+                onUndo={() => onUndoPhoto(message.batch)}
                 stamp={message.stamp}
               />
             );

@@ -317,6 +317,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Image Endpoint
+         * @description Accept an explicitly-attached image, extract everything from it once, discard it.
+         *
+         *     This endpoint IS the "explicit send" moment that
+         *     ``fennoc.vision.client``'s EXPLICIT SEND ONLY rule depends on: the vision
+         *     model is only ever called because a client (the app, on the user's own
+         *     action of attaching a photo) POSTed bytes here. Nothing else in this
+         *     codebase calls ``fennoc.vision.storage.process_image`` — no collector, no
+         *     vault sync, no cron job.
+         *
+         *     The image is NOT stored. It is read into memory, validated, sent to the
+         *     vision model exactly once (with an optional *question* answered in
+         *     addition to the standard thorough extraction — see
+         *     ``fennoc.vision.client.build_extraction_question``), and its bytes are
+         *     discarded by ``process_image`` before this function returns, on every
+         *     path including a failed vision call. Only the resulting
+         *     ``extracted_text`` is persisted.
+         *
+         *     Only recognized image mime types are accepted
+         *     (``fennoc.vision.storage.ALLOWED_MIME_TYPES``) — checked against the
+         *     upload's declared ``Content-Type`` before the body is even read, so an
+         *     obviously-wrong upload (a PDF, a video) is rejected without the bytes
+         *     ever being pulled into memory. The byte-size ceiling
+         *     (``fennoc.vision.client.MAX_IMAGE_BYTES``) is enforced by
+         *     ``process_image`` itself before the vision model is called.
+         */
+        post: operations["upload_image_endpoint_api_image_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/image/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Image Endpoint
+         * @description Undo, for a shot that already finished uploading — makes it real.
+         *
+         *     ``POST /api/image`` never retains the bytes (see that endpoint's own
+         *     docstring), but the ``extracted_text`` row it inserts survives past the
+         *     request — and that row IS the sensitive part: a full transcription of
+         *     whatever was photographed. The app's 10s Undo (Step 11 of the design
+         *     handoff, "Undo lives on the sent message for 10s") only hides the
+         *     message client-side for an already-sent shot unless something also
+         *     deletes this row — this endpoint is that something. A held/offline shot
+         *     doesn't need it: the outbox item is removed and the local file deleted
+         *     before any request is ever made (see ``fennoc-app``'s
+         *     ``cancelHeldUploadsForBatch``), so there is no server row to clean up in
+         *     that case.
+         *
+         *     Idempotent by design: always 204, never 404, whether or not
+         *     *image_id* matched a row. A genuinely unknown id at every OTHER
+         *     endpoint in this file (``/api/tasks/{id}/complete``, `.../drop`) is a
+         *     404, because there the id came from a listing the client had just read
+         *     — a miss means the client is confused about what exists, which is worth
+         *     surfacing. Undo is a different shape of call: the client fires it once
+         *     per shot in the batch with no read beforehand to confirm the row is
+         *     still there, and it can legitimately fire twice for the same id (a
+         *     dropped response retried, or two rapid Undo taps racing each other). In
+         *     both of those the row is equally gone either way — "was already
+         *     deleted" and "I just deleted it" are the same postcondition for a
+         *     caller that only ever wanted to be sure a delete happened, so there is
+         *     nothing for a distinct status code to tell it. Returning 404 on a
+         *     replay would force the client to treat its OWN successful undo as an
+         *     error to swallow, which is a worse design than just being idempotent.
+         *
+         *     Tenancy note: this endpoint does NOT filter by ``images.user`` before
+         *     deleting, matching ``get_image``/``fennoc_recall_image`` (the existing
+         *     read path), which also take an id with no user scoping. That is not a
+         *     deliberate scoping decision made here — it's because there is no
+         *     concept of "the requesting user" flowing through this request at all.
+         *     ``verify_auth`` checks a single shared bearer token
+         *     (``FENNOC_API_TOKEN``) against every caller; nothing about a valid
+         *     request tells this handler who sent it, the way `body.user` does for
+         *     ``/api/push/register``. This is a real gap for a hypothetically
+         *     multi-tenant deployment (one token holder could delete another
+         *     tenant's image row by guessing/observing its id), but it is not a new
+         *     one this endpoint introduces — it is the same shape as every other
+         *     unscoped-by-user read/write already in this file, and inventing a
+         *     scoping scheme just for this one DELETE would be false safety: the GET
+         *     side of the same row is already unscoped.
+         */
+        delete: operations["delete_image_endpoint_api_image__image_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/message": {
         parameters: {
             query?: never;
@@ -423,7 +530,7 @@ export interface components {
             /** Status */
             status: string;
             /** Text */
-            text: string;
+            text: string | null;
             /** Reply */
             reply: string | null;
             /** Reply Lede */
@@ -446,6 +553,17 @@ export interface components {
             voice_violations: {
                 [key: string]: unknown;
             }[] | null;
+            /** Kind */
+            kind: string;
+            /** Trigger */
+            trigger: string | null;
+        };
+        /** Body_upload_image_endpoint_api_image_post */
+        Body_upload_image_endpoint_api_image_post: {
+            /** File */
+            file: string;
+            /** Question */
+            question?: string | null;
         };
         /**
          * BriefingResponse
@@ -562,6 +680,30 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * ImageUploadResponse
+         * @description POST /api/image — mirrors ``fennoc.store.accessors.StoredImage``.
+         *
+         *     The image itself is never stored (see ``fennoc.vision.storage``) — it is
+         *     sent to the vision model exactly once, in this request, and discarded.
+         *     ``extracted_text`` is that one pass's result: a full transcription plus
+         *     scene description. ``id`` is what a subsequent ``fennoc_recall_image``
+         *     tool call (or a follow-up question in the same conversation) references
+         *     to read that text back — the client never needs to re-upload the photo,
+         *     because there is no second look to take.
+         */
+        ImageUploadResponse: {
+            /** Id */
+            id: string;
+            /** Mime */
+            mime: string;
+            /** Byte Size */
+            byte_size: number;
+            /** Created At */
+            created_at: string;
+            /** Extracted Text */
+            extracted_text: string;
         };
         /**
          * OkResponse
@@ -1415,6 +1557,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PushRegisterResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_image_endpoint_api_image_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_image_endpoint_api_image_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_image_endpoint_api_image__image_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
