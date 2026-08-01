@@ -59,27 +59,28 @@ function ShotLine({ shot }: { shot: PhotoBatch["shots"][number] }) {
     );
   }
 
-  // A routed shot renders its caption — "Logged · 2nd this week" — and
-  // nothing else. Step 12a: a recognized log gets a caption line, never
-  // narration; the full extraction stays server-side, in the thread turn
-  // and behind fennoc_recall_image, where the ASSISTANT needs it. Showing
-  // it here was the "very verbose for a normal user" complaint, verbatim.
-  if (shot.caption) {
-    return (
-      <Text className="font-sans text-body text-ink" selectable>
-        {shot.caption}
-      </Text>
-    );
-  }
-
-  // An unrouted shot's extraction collapses behind the same grey-header
-  // treatment the Receipt uses (INT-050's visual language, reused rather
-  // than reinvented). Step 11's reading rule — "one line, then the item.
-  // Never a bulleted extraction dump in the thread" — and the extraction
-  // rendered open was exactly that dump: 75% of the screen, at the same
-  // visual level as the actual answer. The machine text is subordinate
-  // material: available on a tap, never competing with the reply.
-  return <CollapsedExtraction text={shot.extractedText ?? ""} />;
+  // The caption — "Logged · 2nd this week", "Water bill, £84.20, due 12
+  // Aug. Added." — is the shot's one answer-level line (step 11: "one
+  // line, then the item"). The full machine extraction sits collapsed
+  // beneath it in the Receipt's grey-header treatment; rendered open it
+  // was 75% of the screen at the same level as the actual answer, the
+  // exact "bulleted extraction dump in the thread" the design forbids.
+  // A shot with no caption (server predates the router, or routing
+  // declined to say anything) shows just the collapsed extraction.
+  return (
+    <View>
+      {shot.caption ? (
+        <Text className="font-sans text-body text-ink" selectable>
+          {shot.caption}
+        </Text>
+      ) : null}
+      {shot.extractedText ? (
+        <View className={shot.caption ? "mt-1" : undefined}>
+          <CollapsedExtraction text={shot.extractedText} />
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 /**
