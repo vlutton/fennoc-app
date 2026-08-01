@@ -24,6 +24,7 @@ import { Directory, File, Paths } from "expo-file-system";
 
 import { uploadImage } from "../api/client";
 import { enqueueImageUpload, isNetworkError } from "../outbox";
+import { recordPhotoCaptured } from "../store/useDiscoverability";
 import {
   deliverPhotoShotError,
   deliverPhotoShotResult,
@@ -156,6 +157,14 @@ export async function captureShot(photo: CapturedPhoto, opts: CaptureShotOptions
   } else {
     store.appendPhotoShot(opts.batchId, shot);
   }
+
+  // INT-035 ruling 12, layer 3: bump the lifetime photo counter (and,
+  // once, say the one-line library tip) right here — the one place both
+  // the camera hot path and the gallery/library path funnel every shot
+  // through. Fires now, not once the upload below resolves: same "shutter
+  // is send" reasoning as the haptic comment just below — the person has
+  // already taken the photo, whatever happens to the bytes next.
+  recordPhotoCaptured();
 
   // The haptic thump ("one haptic thump confirms") fires at the moment of
   // the shutter press, in the CALLER (CameraCapture) — not here, and not

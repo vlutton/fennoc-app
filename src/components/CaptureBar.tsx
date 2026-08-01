@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
-import { ArrowUp, Camera as CameraIcon, Images, Mic, X } from "lucide-react-native";
+import { ArrowUp, Mic, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import { isNetworkError } from "../outbox";
 import { useThreadStore } from "../store/useThread";
 import { useTheme } from "../theme/useTheme";
 import { CameraCapture } from "./CameraCapture";
+import { CameraKey } from "./CameraKey";
 
 type Feedback = "captured" | "queued" | "error" | null;
 
@@ -36,9 +37,7 @@ const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
 
 /**
  * `bg.float`, 1px top border `line.strong`, padding 14/16, gap 14. The
- * 48×48 library button is a peer that opens the photo picker; it never
- * becomes the resting state. The 72×72 mic is the largest target on
- * screen and the default input.
+ * 72×72 mic is the largest target on screen and the default input.
  *
  * Voice capture itself (listening, auto-stop on silence, haptic + tone
  * confirmation) is INT-025 scope. This shell wires the mic to the same send
@@ -59,31 +58,48 @@ const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
  * bar owns, at a deliberately smaller 56×56 — see the `h-camera`/`w-camera`
  * tailwind tokens — so it never reads as competing with the mic for the
  * thumb. A tap opens `CameraCapture` (the hot path: shutter sends, no
- * review, no caption). Long-pressing it opens the system photo library
- * instead and stages the result in `pendingImage` rather than sending it
+ * review, no caption). Holding it opens the system photo library instead
+ * and stages the result in `pendingImage` rather than sending it
  * immediately — a gallery pick is the ONE place in this whole flow a
  * caption survives (Step 15), because by the time you're choosing an old
  * photo the moment it depicts has already passed, so there's something
  * worth typing.
  *
- * Operator ruling (post-launch): that library path was ALSO reachable only
- * via that same long-press, with no visible affordance beyond a
- * screen-reader-only `accessibilityHint` — fine for an old photograph
- * (there genuinely is no moment to miss), wrong for this operator's actual
- * most-frequent use, a MacroFactor screenshot, which has no moment to miss
- * either and was hidden behind a gesture nobody could see. Rather than add
- * a fourth key and crowd the bar — diluting the 72px mic's deliberate
- * dominance, "the camera never competes for the thumb" — the 48×48 keyboard
- * button was repurposed into the library button below: tapping the
- * composer already focuses it, so that key was a second route to something
- * that already had one, making it the cheapest key to spend. The long-press
- * on the camera key still opens the same library (same function,
- * `openPhotoLibrary`) purely for free muscle-memory continuity; it is no
- * longer the only way in. All of the actual upload/batching/held-queue
- * logic for both the camera and library paths lives in
- * `src/capture/photoCapture.ts`, on purpose: this component only decides
- * WHEN to call it (shutter press vs. picker result vs. Send with something
- * staged), never HOW an upload behaves.
+ * Discoverability history, because this key's affordance has been
+ * relitigated twice:
+ *
+ *   Ruling 11 (2026-07-31, post-launch) found that the hold was reachable
+ *   only via a gesture with no visible affordance beyond a screen-reader-
+ *   only `accessibilityHint` — fine for an old photograph (there genuinely
+ *   is no moment to miss), wrong for the operator's actual most-frequent
+ *   use, a MacroFactor screenshot. It answered by repurposing the 48×48
+ *   keyboard key (redundant since tapping the composer already focuses it)
+ *   into a second, always-visible library button.
+ *
+ *   Ruling 12 (INT-035, step 16) supersedes that with a better answer to
+ *   the SAME problem and restores the original canon — camera 56px, mic
+ *   72px, library is a hold, never the default tap. The dedicated library
+ *   key is gone; discoverability is now three layers instead of a second
+ *   button, all owned by `CameraKey.tsx`:
+ *     1. A standing 5px dot (`SecondaryContextDot`, dim amber, always
+ *        visible) marking that this key hides a second context.
+ *     2. The hold itself answers early — visible, reversible motion
+ *        starting at 180ms, committing with one soft haptic at 400ms —
+ *        rather than a silent `onLongPress` delay.
+ *     3. One ordinary Fennoc thread message, fired once, after the third
+ *        photo, only if the hold has never been used — see
+ *        `src/store/useDiscoverability.ts`'s `recordPhotoCaptured`,
+ *        called from `captureShot`.
+ *   Ruling 12 also requires the library stay reachable WITHOUT the hold —
+ *   "nothing is reachable only through a hold" — which is what
+ *   `onChooseFromLibrary` below wires into `CameraCapture`'s own capture
+ *   sheet: open the camera key, and the library is a second, ordinary tap
+ *   away, no gesture required.
+ *
+ * All of the actual upload/batching/held-queue logic for both the camera
+ * and library paths lives in `src/capture/photoCapture.ts`, on purpose:
+ * this component only decides WHEN to call it (shutter press vs. picker
+ * result vs. Send with something staged), never HOW an upload behaves.
  */
 export function CaptureBar() {
   const { palette } = useTheme();
@@ -114,12 +130,14 @@ export function CaptureBar() {
   // The camera hot path (tap) — CameraCapture is rendered below, toggled by
   // this alone; it owns its own permission/preview/shutter state entirely.
   const [cameraOpen, setCameraOpen] = useState(false);
-  // The library pick (`openPhotoLibrary`, tap the library key or long-press
-  // the camera key) — a picked-but-not-yet-sent photo, waiting on whatever
-  // the user types next as its caption (Step 15: "the next thing you say
-  // is the caption" — the ONE place that's true for a photo, since the
-  // camera hot path never has this state at all). Cleared by sending, by
-  // the X on the attachment strip, or by picking again.
+  // The library pick (`openPhotoLibrary`, reached by holding the camera key
+  // to commit ruling 12's layer 2, or via the capture sheet's non-gesture
+  // route — see CameraCapture's `onChooseFromLibrary`) — a picked-but-not-
+  // yet-sent photo, waiting on whatever the user types next as its caption
+  // (Step 15: "the next thing you say is the caption" — the ONE place
+  // that's true for a photo, since the camera hot path never has this
+  // state at all). Cleared by sending, by the X on the attachment strip,
+  // or by picking again.
   const [pendingImage, setPendingImage] = useState<{ uri: string; mime: string } | null>(null);
   // Selected as an action reference, not derived state — see the store's own
   // "Maximum update depth exceeded" warning on why a selector here must
@@ -250,10 +268,11 @@ export function CaptureBar() {
     );
   };
 
-  // Opens the system photo library — the visible-tap route via the library
-  // key, and also the long-press route on the camera key (kept for muscle
-  // memory; see the top-of-file comment on why the tap is no longer the
-  // library's only entrance). Requested explicitly rather than relying on
+  // Opens the system photo library — reached by holding the camera key
+  // (`CameraKey`'s `onHoldCommit`) or via the capture sheet's ordinary tap
+  // (`CameraCapture`'s `onChooseFromLibrary`); see the top-of-file comment
+  // on ruling 12 for why BOTH exist ("nothing is reachable only through a
+  // hold"). Requested explicitly rather than relying on
   // `launchImageLibraryAsync`'s own implicit prompt-on-first-call, to match
   // this app's existing habit of asking for permission with its own,
   // legible call site (see src/notifications/permissions.ts) rather than
@@ -427,44 +446,22 @@ export function CaptureBar() {
           composer below can now grow to ~4.5 lines. The 72px mic is the
           tallest thing in this row (see the top-of-file comment) and stays
           that way for the first ~3 grown lines (24px each) — through that
-          whole common range, `items-center` is what keeps the library key,
-          camera key, mic and single-line placeholder text sharing one
-          visual centerline, same as before this fix. `items-end` only wins
-          once the input outgrows the mic (the last ~1.5 lines of its
-          range), and switching to it globally would misalign the 48px/56px
-          keys against the mic for every rest state and short entry, which
-          is the overwhelmingly common case per this file's own "the mic is
+          whole common range, `items-center` is what keeps the camera key,
+          mic and single-line placeholder text sharing one visual
+          centerline, same as before this fix. `items-end` only wins once
+          the input outgrows the mic (the last ~1.5 lines of its range),
+          and switching to it globally would misalign the 56px camera key
+          against the mic for every rest state and short entry, which is
+          the overwhelmingly common case per this file's own "the mic is
           the default input" framing — a worse trade. */}
       <View className="flex-row items-center gap-[14px]">
-        {/* 48px, spends the slot the keyboard key used to occupy (see the
-            top-of-file comment's operator ruling) — tapping the composer
-            already focuses it, so this key is better spent opening the
-            library directly, which used to be reachable only by
-            long-pressing the camera key with no visible affordance. */}
-        <Pressable
-          accessibilityLabel="Choose a photo"
-          accessibilityRole="button"
-          className="h-touch w-touch items-center justify-center rounded-sm border border-line-strong active:opacity-80"
-          onPress={openPhotoLibrary}
-        >
-          <Images color={palette.ink.DEFAULT} size={20} />
-        </Pressable>
-
         {/* 56px, deliberately smaller than the 72px mic — "the camera never
             competes for the thumb" (Step 11's capture rules). Tap opens the
-            hot path (CameraCapture, no menu in between); long-press opens
-            the library too, same as the dedicated library key to the left —
-            kept for muscle memory, never the only way in. */}
-        <Pressable
-          accessibilityHint="Long-press to choose a photo from your library"
-          accessibilityLabel="Camera"
-          accessibilityRole="button"
-          className="h-camera w-camera items-center justify-center rounded-sm border border-line-strong active:opacity-80"
-          onLongPress={openPhotoLibrary}
-          onPress={() => setCameraOpen(true)}
-        >
-          <CameraIcon color={palette.ink.DEFAULT} size={22} />
-        </Pressable>
+            hot path (CameraCapture, no menu in between); holding it reveals
+            and opens the library — see CameraKey.tsx for ruling 12's three
+            discoverability layers, which is why this is no longer a plain
+            `Pressable` with `onLongPress`. */}
+        <CameraKey onHoldCommit={openPhotoLibrary} onTapCamera={() => setCameraOpen(true)} />
 
         <TextInput
           autoCapitalize="sentences"
@@ -519,7 +516,16 @@ export function CaptureBar() {
         </Pressable>
       </View>
 
-      <CameraCapture onClose={() => setCameraOpen(false)} visible={cameraOpen} />
+      {/* `onChooseFromLibrary` is ruling 12's non-gesture route — "nothing
+          is reachable only through a hold... library is also reachable
+          from the capture sheet." Passing the SAME `openPhotoLibrary`
+          `CameraKey`'s hold commits into means there is exactly one "open
+          the library" implementation regardless of which door was used. */}
+      <CameraCapture
+        onChooseFromLibrary={openPhotoLibrary}
+        onClose={() => setCameraOpen(false)}
+        visible={cameraOpen}
+      />
 
       {feedback === "captured" ? (
         <Text className="font-sans text-caption text-ink-muted">

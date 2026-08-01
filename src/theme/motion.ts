@@ -26,6 +26,30 @@ export const PRESENCE_THINK_STAGGER = 160;
 /** `sheet.rise` — translateY 100%→0 (reduced twin: 160ms fade, no translate). */
 export const SHEET_RISE = 320;
 
+// --- INT-035 ruling 12, layer 2: the hold-to-reveal press -----------------
+//
+// "0ms rest. At 180ms a sliver lifts; release now and it settles back —
+// nothing happened. At 400ms it's committed, one soft haptic — the dot has
+// become the menu." These three numbers are the whole contract; see
+// `CameraKey.tsx` for the one call site today. A plain `onLongPress` with a
+// 400ms delay does NOT satisfy this — there must be visible, reversible
+// motion in the 180–400ms gap itself, which is why these are exported as
+// named waypoints rather than one opaque "long press delay."
+
+/** Elapsed ms from press-in before the first visible motion — "a sliver
+ *  lifts." Before this, the press is indistinguishable from a tap in
+ *  progress: 0ms rest. */
+export const HOLD_LIFT_START_MS = 180;
+/** Elapsed ms from press-in at which the hold commits — one soft haptic,
+ *  the action fires. Releasing at any point before this undoes everything
+ *  the lift has shown so far; releasing at or after it is too late to
+ *  undo — the action has already happened. */
+export const HOLD_LIFT_COMMIT_MS = 400;
+/** The window the lift's rise animates across. Derived, not independently
+ *  tunable — `HOLD_LIFT_START_MS` and `HOLD_LIFT_COMMIT_MS` above are the
+ *  single source of truth for both endpoints. */
+export const HOLD_LIFT_RISE_MS = HOLD_LIFT_COMMIT_MS - HOLD_LIFT_START_MS;
+
 // --- Curves -----------------------------------------------------------------
 //
 // Exact control points from tailwind.config.js's `transitionTimingFunction`

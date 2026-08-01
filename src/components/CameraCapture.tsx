@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
-import { X } from "lucide-react-native";
+import { Images, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import {
@@ -15,6 +15,17 @@ import { captureShot } from "../capture/photoCapture";
 interface CameraCaptureProps {
   visible: boolean;
   onClose: () => void;
+  /**
+   * Ruling 12's (INT-035) non-gesture route to the library — "nothing is
+   * reachable only through a hold... library is also reachable from the
+   * capture sheet." This IS "the capture sheet" the ruling names: since the
+   * dedicated 48px library key is gone (superseded by `CameraKey`'s hold),
+   * this screen is the one other place, besides the hold itself, where
+   * "choose from library" is an ordinary tap. Callers pass the same
+   * `openPhotoLibrary` the hold commits into (see CaptureBar.tsx) — there
+   * is exactly one "open the library" implementation regardless of door.
+   */
+  onChooseFromLibrary: () => void;
 }
 
 /** `CameraCapturedPicture.format` is only ever `'jpg' | 'png'` (see
@@ -27,11 +38,20 @@ function mimeForFormat(format: "jpg" | "png"): string {
 
 /**
  * Step 11's "no viewfinder chrome": full-bleed preview, a Cancel affordance,
- * a shutter. Nothing else — no flash toggle, no grid, no flip-camera, no
- * zoom slider. Those are all real camera-app features this deliberately
- * does not build, because every one of them is a second decision standing
- * between "point" and "sent," and the whole design bet here is that there
- * is exactly one decision: point, then shutter.
+ * a shutter, and — as of ruling 12 (INT-035) — one more: a small "choose
+ * from library" affordance, the non-gesture route the ruling requires exist
+ * SOMEWHERE now that the dedicated library key is gone (see this file's
+ * `onChooseFromLibrary` prop doc). Nothing else — no flash toggle, no grid,
+ * no flip-camera, no zoom slider. Those are all real camera-app features
+ * this deliberately does not build, because every one of them is a second
+ * decision standing between "point" and "sent," and the whole design bet
+ * here is that there is exactly one decision: point, then shutter. The
+ * library affordance is a deliberate exception to that rule, not a crack in
+ * it — ruling 11 already rejected a library button INSIDE this screen as
+ * the library's PRIMARY route (it charges an unwanted camera warm-up), but
+ * as a rarely-used fallback for people who never found — or can't
+ * perform — the hold, the cost of having already opened the camera is a
+ * sunk one by the time this button is visible at all.
  *
  * Multi-shot bookkeeping lives entirely in two refs, reset once per
  * camera-open (the effect below, keyed on `visible`): `batchIdRef` is
@@ -43,7 +63,7 @@ function mimeForFormat(format: "jpg" | "png"): string {
  * stays mounted (with `visible` toggling) rather than being torn down and
  * rebuilt by CaptureBar — see its own render of this component.
  */
-export function CameraCapture({ visible, onClose }: CameraCaptureProps) {
+export function CameraCapture({ visible, onClose, onChooseFromLibrary }: CameraCaptureProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -110,6 +130,15 @@ export function CameraCapture({ visible, onClose }: CameraCaptureProps) {
       .finally(() => setCapturing(false));
   };
 
+  // Closes this screen and opens the library, in that order — once the
+  // person has chosen "not the camera," there is nothing left for this
+  // screen to do; leaving it open behind the system picker would just be a
+  // second surface to dismiss afterward.
+  const onChooseFromLibraryPress = () => {
+    onClose();
+    onChooseFromLibrary();
+  };
+
   return (
     <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       {/* `react-native-safe-area-context`'s app-root `SafeAreaProvider`
@@ -156,19 +185,34 @@ export function CameraCapture({ visible, onClose }: CameraCaptureProps) {
           )}
 
           <SafeAreaView className="absolute inset-0" pointerEvents="box-none">
-            {/* Cancel — top-left, the only chrome besides the shutter (Step
-                11: "Camera · no viewfinder chrome / Cancel / [shutter]").
-                Closing here never undoes shots already taken: those are
-                already sent per shutter-is-send, and the only undo is the
-                10s window on the sent message itself (PhotoMessage). */}
-            <Pressable
-              accessibilityLabel="Cancel"
-              accessibilityRole="button"
-              className="ml-4 mt-3 h-touch w-touch items-center justify-center rounded-full bg-black/40"
-              onPress={onClose}
-            >
-              <X color="#FFFFFF" size={22} />
-            </Pressable>
+            <View className="flex-row items-center justify-between px-4 pt-3">
+              {/* Cancel — top-left. Closing here never undoes shots already
+                  taken: those are already sent per shutter-is-send, and the
+                  only undo is the 10s window on the sent message itself
+                  (PhotoMessage). */}
+              <Pressable
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
+                className="h-touch w-touch items-center justify-center rounded-full bg-black/40"
+                onPress={onClose}
+              >
+                <X color="#FFFFFF" size={22} />
+              </Pressable>
+
+              {/* "Choose from library" — top-right. Ruling 12's (INT-035)
+                  non-gesture route; see this file's module doc and
+                  `onChooseFromLibrary`'s own doc for why this exists and
+                  why it's deliberately NOT the primary way in. */}
+              <Pressable
+                accessibilityHint="Opens your photo library instead of the camera"
+                accessibilityLabel="Choose from library"
+                accessibilityRole="button"
+                className="h-touch w-touch items-center justify-center rounded-full bg-black/40"
+                onPress={onChooseFromLibraryPress}
+              >
+                <Images color="#FFFFFF" size={20} />
+              </Pressable>
+            </View>
 
             <View className="flex-1" />
 

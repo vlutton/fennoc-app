@@ -2,5 +2,14 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  // `eslint.config.js` is a CommonJS Node config, not app source: it uses
+  // `__dirname` and imports `eslint-plugin-tailwindcss`, which ships no types.
+  // Adding it (2026-07-31, alongside the linter itself) put two errors into a
+  // previously clean `tsc --noEmit` — which is how a type check quietly stops
+  // being a signal. It is still linted, by its own `files:` override inside
+  // eslint.config.js, so excluding it here loses no coverage: it is checked by
+  // the tool it configures, just not by the compiler that has no business
+  // reading it.
+  "exclude": ["eslint.config.js"]
 }

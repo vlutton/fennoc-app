@@ -31,7 +31,7 @@ export interface Palette {
   bg: { base: string; raised: string; overlay: string };
   line: { hairline: string; strong: string };
   ink: { DEFAULT: string; secondary: string; muted: string; disabled: string };
-  signal: { DEFAULT: string; wash: string };
+  signal: { DEFAULT: string; on: string; wash: string };
   positive: string;
   clay: string;
   alert: string;
@@ -55,8 +55,17 @@ export const nightPalette: Palette = {
     muted: rawTokens.ink.muted,
     disabled: rawTokens.ink.disabled,
   },
+  // `on` was previously omitted here — every existing use of "text on a
+  // signal-coloured surface" went through the `text-signal-on` Tailwind
+  // className, which resolves via the CSS var tokens.js already sets, so
+  // nothing needed the raw hex JS-side. CameraKey.tsx (INT-035 ruling 12)
+  // is the first caller that colours something INSIDE a reanimated
+  // `useAnimatedStyle` (the library glyph on the hold-to-reveal badge),
+  // where a className can't reach — added rather than duplicated as a
+  // local hex literal, so this stays the one place the value is authored.
   signal: {
     DEFAULT: rawTokens.signal.DEFAULT,
+    on: rawTokens.signal.on,
     wash: rawTokens.signal.wash,
   },
   positive: rawTokens.positive,
@@ -83,6 +92,7 @@ export const dayPalette: Palette = {
   },
   signal: {
     DEFAULT: rawTokens.day.signal,
+    on: rawTokens.day.signalOn,
     wash: rawTokens.day.signalWash,
   },
   positive: rawTokens.day.positive,
