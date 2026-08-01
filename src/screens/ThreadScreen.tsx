@@ -4,12 +4,14 @@ import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { deleteImage, formatApiError } from "../api/client";
+import type { AgentAction } from "../api/types";
 import { BriefingSheet } from "../components/BriefingSheet";
 import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
 import { LedgerSheet } from "../components/LedgerSheet";
 import { PhotoMessage } from "../components/PhotoMessage";
+import { qualifiesForReceipt, Receipt } from "../components/Receipt";
 import { ReplySheet } from "../components/ReplySheet";
 import { StatusStrip } from "../components/StatusStrip";
 import { Strip } from "../components/Strip";
@@ -59,6 +61,9 @@ type ThreadMessage =
       state: "thinking" | "done" | "error";
       text: string;
       body: string | null;
+      /** See AgentAction's own doc comment — null on old turns / a server
+       *  build that doesn't send this yet. */
+      actions: AgentAction[] | null;
     };
 
 /**
@@ -218,6 +223,12 @@ function AgentTurnWatcher({ messageId }: { messageId: string }) {
         text: data.reply_lede ?? data.reply ?? "",
         body: data.reply_body,
         state: "done",
+        // `actions` isn't in the generated schema yet (see AgentAction's
+        // doc comment in api/types.ts) — `data.actions` reads as
+        // `undefined` against any server build that hasn't shipped it,
+        // which `?? null` folds into the same "nothing to show" case
+        // `qualifiesForReceipt` already treats `null` as.
+        actions: data.actions ?? null,
       });
     } else if (data.status === "error") {
       resolveAgent(messageId, {
@@ -326,6 +337,13 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   const addFennocLine = useThreadStore((s) => s.addFennocLine);
   const setReplyingTo = useThreadStore((s) => s.setReplyingTo);
   const undoPhotoBatch = useThreadStore((s) => s.undoPhotoBatch);
+  // The whole map, not a per-message slice — selecting `receiptExpanded[id]`
+  // here would need `id` in the selector's closure per row, and a selector
+  // that computes rather than reads verbatim is the exact "fresh value every
+  // read" trap the comment above already warns about. Reading the map once
+  // and indexing it per-row at render time (below) is cheap and correct.
+  const receiptExpanded = useThreadStore((s) => s.receiptExpanded);
+  const toggleReceiptExpanded = useThreadStore((s) => s.toggleReceiptExpanded);
   const pendingQuery = usePendingCheckin();
   const replyMutation = useReplyCheckin();
 
@@ -381,6 +399,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
           state: capture.agent.state,
           text: capture.text,
           body: capture.agent.body,
+          actions: capture.agent.actions,
         });
         continue;
       }
@@ -608,6 +627,19 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
             return (
               <View key={message.id}>
                 <FennocLine stamp={message.stamp} text={message.text} />
+                {/* INT-050 — sits above the message body (the collapsed
+                    "Read the rest" content and Reply CTA below), never
+                    rendered at all when the turn doesn't qualify (see
+                    qualifiesForReceipt) — most turns carry no `actions` yet
+                    (old turns, or a server build that hasn't shipped the
+                    field), and this stays silent for every one of them. */}
+                {message.actions && qualifiesForReceipt(message.actions) ? (
+                  <Receipt
+                    actions={message.actions}
+                    expanded={receiptExpanded[message.messageId] === true}
+                    onToggle={() => toggleReceiptExpanded(message.messageId)}
+                  />
+                ) : null}
                 {message.body !== null || hasQuestion ? (
                   <View className="mt-2 flex-row items-center gap-2">
                     {message.body !== null ? (
