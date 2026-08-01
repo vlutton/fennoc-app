@@ -33,20 +33,21 @@ import { quietEasing, STATE_TICK, useReducedMotion } from "../theme/motion";
 
 /**
  * The single gate for whether a turn's receipt is worth showing at all —
- * kept in one function per the task brief, so "when does the header
- * appear" has exactly one answer everywhere it's asked. Per the intent's
- * threshold (INT-050 "The threshold: not every turn"): two or more ledger
- * writes, a photo read (any `"read"` action — the only read case this
- * build's server produces per INT-046), or a decline. A one-line answer —
- * zero or one action, no read, no decline — never carries the header:
- * "a disclosure on every turn trains the eye to ignore it."
+ * kept in one function so "when does the header appear" has exactly one
+ * answer everywhere it's asked. Per the intent's threshold (INT-050 "When
+ * the header appears"): two or more ledger writes, a photo read, or a
+ * decline. NOT any read — the server marks every read-only tool (list
+ * tasks, web search, vault search, status…) as `"read"`, so keying on reads
+ * would put the header on nearly every turn, and "a disclosure on every
+ * turn trains the eye to ignore it." The photo-read case needs a
+ * server-side marker that does not exist yet — TODO(INT-050): include it
+ * when the actions contract can say "this read was a photo".
  */
 export function qualifiesForReceipt(actions: AgentAction[] | null | undefined): boolean {
   if (!actions || actions.length === 0) return false;
   const writeCount = actions.reduce((n, a) => (a.kind === "write" ? n + 1 : n), 0);
-  const hasRead = actions.some((a) => a.kind === "read");
   const hasDecline = actions.some((a) => a.kind === "decline");
-  return writeCount >= 2 || hasRead || hasDecline;
+  return writeCount >= 2 || hasDecline;
 }
 
 const KIND_LABEL: Record<AgentAction["kind"], string> = {
