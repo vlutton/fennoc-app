@@ -352,6 +352,19 @@ export interface paths {
          *     ever being pulled into memory. The byte-size ceiling
          *     (``fennoc.vision.client.MAX_IMAGE_BYTES``) is enforced by
          *     ``process_image`` itself before the vision model is called.
+         *
+         *     **The read also joins the thread (INT-046).** Before this, a successful
+         *     extraction landed in the ``images`` table and was returned to the app —
+         *     both of which the agent's own ``hydrate_history()`` never reads — so the
+         *     assistant had no memory of a photo it had just processed. Confirmed in
+         *     production 2026-08-01: three extractions, minutes apart, while Fennoc
+         *     truthfully denied ever seeing an image. ``create_image_turn`` (see its
+         *     own docstring) writes the same shape INT-013 established for check-ins —
+         *     a ``kind='user'`` row, already ``done`` — so the next turn on the thread
+         *     sees the read without anyone having to ask again. The ``images`` row
+         *     keeps being written exactly as before; it remains what
+         *     ``fennoc_recall_image`` reads from, it just stops being the *only* place
+         *     the read exists.
          */
         post: operations["upload_image_endpoint_api_image_post"];
         delete?: never;
@@ -557,6 +570,10 @@ export interface components {
             kind: string;
             /** Trigger */
             trigger: string | null;
+            /** Actions */
+            actions: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /** Body_upload_image_endpoint_api_image_post */
         Body_upload_image_endpoint_api_image_post: {
@@ -626,12 +643,27 @@ export interface components {
             /** Question Type */
             question_type?: string | null;
         };
-        /** CheckinReplyResponse */
+        /**
+         * CheckinReplyResponse
+         * @description POST /api/checkin/reply.
+         *
+         *     ``ok``/``ack`` are unchanged from before INT-013 — ``ack`` is still the
+         *     deterministic parser's own text (a logged-summary or a follow-up
+         *     question), returned synchronously so the client's immediate UI feedback
+         *     is unaffected. ``message_id`` is new and additive: the reply is now also
+         *     a turn in the thread, dispatched to the agent the same way
+         *     POST /api/message is (see ``_agent_turn_worker``), and this is the id a
+         *     client polls via GET /api/message/{id} — the same
+         *     addAgentPending/resolveAgent pattern a normal message uses — to pick up
+         *     Fennoc's in-context response once it resolves.
+         */
         CheckinReplyResponse: {
             /** Ok */
             ok: boolean;
             /** Ack */
             ack: string;
+            /** Message Id */
+            message_id: string;
         };
         /** CreateTaskRequest */
         CreateTaskRequest: {
@@ -704,6 +736,8 @@ export interface components {
             created_at: string;
             /** Extracted Text */
             extracted_text: string;
+            /** Caption */
+            caption?: string | null;
         };
         /**
          * OkResponse

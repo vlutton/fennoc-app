@@ -204,6 +204,7 @@ async function replayItem(item: OutboxItem): Promise<void> {
       deliverPhotoShotResult(batchId, localShotId, {
         imageId: result.id,
         extractedText: result.extracted_text,
+        caption: result.caption ?? null,
       });
 
       // The durable copy (persistForHold, photoCapture.ts) served exactly

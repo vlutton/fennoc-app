@@ -88,6 +88,14 @@ export interface PhotoShot {
   imageId: string | null;
   /** The one-pass extraction result. Null until `state` is "done". */
   extractedText: string | null;
+  /**
+   * The capture route's short reply when the server recognized this
+   * image's shape and filed it — "Logged · 2nd this week". When present,
+   * the shot renders THIS instead of `extractedText`: a routed log gets a
+   * caption line, never narration (Step 12a). Null = not routed; the
+   * extraction is the read.
+   */
+  caption: string | null;
   /** One line, no retry button (Step 11's "Reading" rules) — set on
    *  "error" and on a "held" shot that eventually exhausts its retries. */
   errorText: string | null;
@@ -379,7 +387,7 @@ export function useTodayCaptures(): ThreadCapture[] {
 export function deliverPhotoShotResult(
   batchId: string,
   localShotId: string,
-  result: { imageId: string; extractedText: string },
+  result: { imageId: string; extractedText: string; caption?: string | null },
 ): void {
   const store = useThreadStore.getState();
   const capture = store.captures.find((c) => c.photo?.batchId === batchId);
@@ -388,6 +396,7 @@ export function deliverPhotoShotResult(
       state: "done",
       imageId: result.imageId,
       extractedText: result.extractedText,
+      caption: result.caption ?? null,
       localUri: null,
     });
     if (capture.photo.undone) {

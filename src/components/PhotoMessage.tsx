@@ -59,8 +59,21 @@ function ShotLine({ shot }: { shot: PhotoBatch["shots"][number] }) {
     );
   }
 
-  // The extracted read itself — the whole point of the shot. No Pressable
-  // wraps any ShotLine; Undo lives on the header above (see PhotoMessage).
+  // A routed shot renders its caption — "Logged · 2nd this week" — and
+  // nothing else. Step 12a: a recognized log gets a caption line, never
+  // narration; the full extraction stays server-side, in the thread turn
+  // and behind fennoc_recall_image, where the ASSISTANT needs it. Showing
+  // it here was the "very verbose for a normal user" complaint, verbatim.
+  if (shot.caption) {
+    return (
+      <Text className="font-sans text-body text-ink" selectable>
+        {shot.caption}
+      </Text>
+    );
+  }
+
+  // The extracted read itself — the whole point of an unrouted shot. No
+  // Pressable wraps any ShotLine; Undo lives on the header above.
   return (
     <Text className="font-sans text-body text-ink" selectable>
       {shot.extractedText}

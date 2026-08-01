@@ -87,7 +87,11 @@ export function useReplyCheckin() {
     }: {
       text: string;
       questionType: string;
-    }): Promise<CheckinReply & { queued?: true }> => {
+      // The queued variant is its own shape: an offline reply has no
+      // message_id, because no turn exists yet — the outbox will create it
+      // on drain. (message_id became required on the server response when
+      // INT-013 routed replies through the agent.)
+    }): Promise<(CheckinReply | { ok: true; ack: string; message_id?: undefined }) & { queued?: true }> => {
       try {
         return await replyCheckin(text, questionType);
       } catch (error) {

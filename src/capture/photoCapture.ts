@@ -148,6 +148,7 @@ export async function captureShot(photo: CapturedPhoto, opts: CaptureShotOptions
     localUri: photo.uri,
     imageId: null,
     extractedText: null,
+    caption: null,
     errorText: null,
   };
 
@@ -177,6 +178,7 @@ export async function captureShot(photo: CapturedPhoto, opts: CaptureShotOptions
     deliverPhotoShotResult(opts.batchId, localId, {
       imageId: result.id,
       extractedText: result.extracted_text,
+      caption: result.caption ?? null,
     });
     return;
   } catch (error) {
