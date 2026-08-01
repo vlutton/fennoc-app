@@ -170,8 +170,17 @@ export function LedgerTimeSection() {
           className="mb-3 min-h-[64px] justify-center rounded-md border border-dashed border-line-strong bg-bg-raised px-4 py-3"
           key={gap.startMs}
         >
-          <Text className="font-mono-medium text-body text-ink-muted">{formatClock(gap.endMs - gap.startMs)}</Text>
-          <Text className="mt-1 font-sans text-dataSm text-ink-muted">Attention leaked here</Text>
+          <Text className="font-mono-medium text-body text-ink-muted" selectable>
+            {formatClock(gap.endMs - gap.startMs)}
+          </Text>
+          <Text className="mt-1 font-sans text-dataSm text-ink-muted" selectable>
+            Attention leaked here
+          </Text>
+          {/* "TAP TO NAME IT" below stays non-selectable on purpose: it's the
+              label ON a Pressable (the row's own tap target, currently a
+              no-op pending a real endpoint — see the comment inside), not
+              read-only prose, so selection would compete with that tap
+              rather than sit beside it. */}
           <Pressable
             accessibilityLabel={`Name the gap between ${hhmm(gap.startMs)} and ${hhmm(gap.endMs)}`}
             accessibilityRole="button"
@@ -199,10 +208,12 @@ export function LedgerTimeSection() {
             className="mb-2 min-h-[64px] flex-row items-center justify-between rounded-md border border-line-hairline bg-bg-raised px-4 py-3"
             key={block.block_id}
           >
-            <Text className="mr-3 flex-1 font-sans text-body text-ink" numberOfLines={1}>
+            <Text className="mr-3 flex-1 font-sans text-body text-ink" numberOfLines={1} selectable>
               {block.label ? `${block.category} · ${block.label}` : block.category}
             </Text>
-            <Text className="font-mono-medium text-dataSm text-ink-muted">{formatDuration(block.duration_s)}</Text>
+            <Text className="font-mono-medium text-dataSm text-ink-muted" selectable>
+              {formatDuration(block.duration_s)}
+            </Text>
           </View>
         ))
       )}

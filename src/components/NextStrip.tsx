@@ -110,6 +110,13 @@ export function NextStrip() {
           the rest, exactly as the ledger rows now work. Consistency matters
           here: the same gesture should reveal the same thing everywhere.
         */}
+        {/* NOT `selectable` on the title Text below — same conflict as
+            TaskRow's identical pattern (see its own comment on this exact
+            Pressable-wraps-the-title shape): making it selectable risks
+            fighting the tap-to-expand this Pressable exists for, and that
+            can't be verified without a real device (dev server is out of
+            scope for this pass). Left alone and reported rather than risking
+            a silent regression on the strip that never leaves the screen. */}
         <Pressable
           accessibilityHint={expanded ? "Tap to collapse" : "Tap to show the full task"}
           accessibilityLabel={nextTask.title}

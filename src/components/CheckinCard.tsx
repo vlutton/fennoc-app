@@ -55,8 +55,11 @@ export function CheckinCard({ pending, onReply, sending = false }: CheckinCardPr
         </Text>
 
         {/* 5. text-display — the only element in the entire product
-            allowed display size. */}
-        <Text className="mt-2 font-sans-semibold text-display text-ink">
+            allowed display size. Selectable: this is the question itself,
+            substantive text worth quoting back, and nothing on this Text
+            has a press handler for selection to fight — the card's own
+            taps all live on the Answer/Not now buttons below. */}
+        <Text className="mt-2 font-sans-semibold text-display text-ink" selectable>
           {pending.question_text ?? "What are you working on?"}
         </Text>
 

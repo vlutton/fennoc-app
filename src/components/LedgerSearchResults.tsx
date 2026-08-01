@@ -72,7 +72,11 @@ export function LedgerSearchResults({ query }: { query: string }) {
             <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
               {hit.kind.toUpperCase()} · {hit.meta}
             </Text>
-            <Text className="mt-1 font-sans text-body text-ink" numberOfLines={2}>
+            {/* Read-only summary row (capture/time-block/briefing hits have
+                nowhere else to act on them — see this file's own header
+                comment), so selectable is the only affordance it needs; no
+                Pressable sits over it the way TaskRow's title has. */}
+            <Text className="mt-1 font-sans text-body text-ink" numberOfLines={2} selectable>
               {hit.title}
             </Text>
           </View>

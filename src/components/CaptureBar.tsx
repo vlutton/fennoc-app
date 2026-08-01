@@ -393,7 +393,11 @@ export function CaptureBar() {
             <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
               REPLYING TO
             </Text>
-            <Text className="mt-1 font-sans text-caption text-ink-secondary" numberOfLines={2}>
+            <Text
+              className="mt-1 font-sans text-caption text-ink-secondary"
+              numberOfLines={2}
+              selectable
+            >
               {replyingTo.quote}
             </Text>
           </View>
@@ -538,7 +542,12 @@ export function CaptureBar() {
         </Text>
       ) : null}
       {feedback === "error" ? (
-        <Text className="font-sans text-caption text-alert">
+        // The exact bug report behind this whole task: "the operator hit
+        // this trying to copy an error message to send me, and couldn't."
+        // No Pressable wraps this Text and the composer's own growth
+        // behaviour (COMPOSER_MIN_HEIGHT/MAX_HEIGHT above) is untouched —
+        // this is the one line under the bar, not the input itself.
+        <Text className="font-sans text-caption text-alert" selectable>
           {errorMsg ?? "Capture failed."}
         </Text>
       ) : null}

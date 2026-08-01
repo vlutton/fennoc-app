@@ -72,7 +72,12 @@ export function LedgerBriefingsSection() {
             <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
               {entry.dayLabel} · {entry.kindLabel}
             </Text>
-            <Text className="mt-1 font-sans text-body text-ink" numberOfLines={2}>
+            {/* Archive entries are plain text here, not MarkdownRenderer —
+                the full briefing (with formatting) opens via ThreadScreen's
+                "Read briefing" sheet; this is just the clipped preview
+                line, and it has no Pressable over it to fight for the
+                long-press. */}
+            <Text className="mt-1 font-sans text-body text-ink" numberOfLines={2} selectable>
               {entry.text}
             </Text>
           </View>

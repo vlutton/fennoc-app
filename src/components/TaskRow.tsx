@@ -163,6 +163,19 @@ export function TaskRow({ task, onComplete, onDrop, busy = false, held = false }
           </View>
         </Pressable>
 
+        {/* NOT `selectable` (see the app-wide text-selectability pass this
+            row was audited under). The title Text below is the Pressable's
+            OWN tap target — this is a genuine conflict, not an oversight:
+            RN's native text-selection gesture is implemented with its own
+            platform-level recognizers on the Text view, which are known
+            (widely reported against RN's Text/Touchable pairing, especially
+            on Android's `setTextIsSelectable`) to compete with — and on some
+            platforms swallow — a wrapping Pressable's own touch handling,
+            not just its long-press. This component's tap-to-expand is the
+            entire reason the row is readable at all (see `expanded` above),
+            so risking it silently breaking to gain selection here is the
+            wrong trade without a real device to verify the outcome on.
+            Flagged, not fixed — see the task's final report. */}
         <Pressable
           accessibilityHint={expanded ? "Tap to collapse the title" : "Tap to show the full title"}
           accessibilityLabel={task.title}

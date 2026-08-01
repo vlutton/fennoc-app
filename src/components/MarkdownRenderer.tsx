@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import Markdown from "react-native-markdown-display";
+import { Text } from "react-native";
+import Markdown, { type RenderRules } from "react-native-markdown-display";
 
 import type { Palette } from "../theme/colors";
 import { useTheme } from "../theme/useTheme";
@@ -118,8 +119,85 @@ interface MarkdownRendererProps {
   text: string;
 }
 
+/**
+ * "Adding `selectable` to a wrapper does not automatically propagate into a
+ * markdown renderer's internal `<Text>` children" — and it doesn't here.
+ * `react-native-markdown-display`'s own render rules (its `renderRules.js`)
+ * render every leaf of parsed prose as a bare `<Text>` with no `selectable`
+ * prop, and RN defaults that to `false`. Those leaves are not descendants of
+ * one outer `<Text>` this component controls — they're direct children of
+ * `<View>` block wrappers (`paragraph`/`heading*`/`list_item`), so wrapping
+ * `<Markdown>` itself in a selectable `<Text>` reaches none of them. Each
+ * leaf rule needs the prop itself.
+ *
+ * `groupTextTokens` (the library's own token pass, `src/lib/util/
+ * groupTextTokens.js`) already merges every run of consecutive inline
+ * tokens — plain text, **strong**, *em*, `code`, links, line breaks —
+ * into ONE `textgroup` node before the library renders it; the inline
+ * children (`strong`/`em`/`code_inline`/etc., each its own nested `<Text>`
+ * per the default rules) are what `textgroup` wraps. So overriding
+ * `textgroup` alone is what makes a whole sentence with mixed formatting
+ * selectable as one unit — RN flattens nested `<Text>` into a single native
+ * text block, so the un-touched `strong`/`em`/`code_inline` rules inherit
+ * it from their selectable `textgroup` parent and don't need their own
+ * override. `text` (a bare top-level text node outside any inline run —
+ * rare, but the library ships a default rule for it) gets the same
+ * treatment for the same reason `textgroup` does. `code_block` and `fence`
+ * are block tokens — `groupTextTokens` never folds them into a `textgroup`
+ * — so they render as their own standalone `<Text>` and need `selectable`
+ * set directly.
+ *
+ * This is confirmed by reading `renderRules.js` itself, not assumed: the
+ * six rules below are copied from its defaults with only `selectable`
+ * added, and `getRenderer` (`index.js`) merges a `rules` prop with the
+ * library's defaults (`{...renderRules, ...(rules || {})}`) rather than
+ * replacing them, so overriding just these six leaves every other rule —
+ * lists, links, images, tables, code styling — untouched.
+ */
+const selectableRules: RenderRules = {
+  textgroup: (node, children, parent, styles) => (
+    <Text key={node.key} selectable style={styles.textgroup}>
+      {children}
+    </Text>
+  ),
+  text: (node, children, parent, styles, inheritedStyles = {}) => (
+    <Text key={node.key} selectable style={[inheritedStyles, styles.text]}>
+      {node.content}
+    </Text>
+  ),
+  code_block: (node, children, parent, styles, inheritedStyles = {}) => {
+    // Same trailing-newline trim as the library's own default rule — the
+    // parser sends an extra one, and this rule only exists to add
+    // `selectable`, not to change what's shown.
+    let { content } = node;
+    if (typeof node.content === "string" && node.content.endsWith("\n")) {
+      content = node.content.slice(0, -1);
+    }
+    return (
+      <Text key={node.key} selectable style={[inheritedStyles, styles.code_block]}>
+        {content}
+      </Text>
+    );
+  },
+  fence: (node, children, parent, styles, inheritedStyles = {}) => {
+    let { content } = node;
+    if (typeof node.content === "string" && node.content.endsWith("\n")) {
+      content = node.content.slice(0, -1);
+    }
+    return (
+      <Text key={node.key} selectable style={[inheritedStyles, styles.fence]}>
+        {content}
+      </Text>
+    );
+  },
+};
+
 export function MarkdownRenderer({ text }: MarkdownRendererProps) {
   const { palette } = useTheme();
   const markdownStyles = useMemo(() => buildMarkdownStyles(palette), [palette]);
-  return <Markdown style={markdownStyles}>{text}</Markdown>;
+  return (
+    <Markdown rules={selectableRules} style={markdownStyles}>
+      {text}
+    </Markdown>
+  );
 }

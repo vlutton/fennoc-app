@@ -72,7 +72,13 @@ function FennocLine({ stamp, text }: { stamp: string; text: string }) {
       <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
         {stamp}
       </Text>
-      <Text className="mt-1 font-sans text-lead text-ink">{text}</Text>
+      {/* Selectable, not the stamp above it: "anything worth reading is
+          worth quoting" is about what Fennoc SAID, not the clock reading
+          next to it. No Pressable wraps this Text — nothing here competes
+          with the native long-press-to-select gesture. */}
+      <Text className="mt-1 font-sans text-lead text-ink" selectable>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -104,7 +110,9 @@ function FennocMessage({
       <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
         {stamp}
       </Text>
-      <Text className="mt-1 font-sans text-lead text-ink">{label}</Text>
+      <Text className="mt-1 font-sans text-lead text-ink" selectable>
+        {label}
+      </Text>
       {onOpen ? (
         <Pressable
           accessibilityLabel="Read briefing"
@@ -124,7 +132,12 @@ function UserBubble({ text }: { text: string }) {
   return (
     <View className="items-end">
       <View className="max-w-[84%] rounded-tl-md rounded-tr-md rounded-bl-md rounded-br-[4px] border border-line-hairline bg-bg-raised px-4 py-3">
-        <Text className="font-sans text-body text-ink">{text}</Text>
+        {/* The user's own words, not just Fennoc's — "the user's own
+            messages" per the selectability rule. No Pressable wraps the
+            bubble itself, so there's no tap/long-press to fight. */}
+        <Text className="font-sans text-body text-ink" selectable>
+          {text}
+        </Text>
       </View>
     </View>
   );
@@ -162,7 +175,12 @@ function AgentError({ stamp, error }: { stamp: string; error: string }) {
       <Text className="font-mono-medium text-dataSm text-ink-muted" numberOfLines={1}>
         {stamp}
       </Text>
-      <Text className="mt-1 font-sans text-lead text-alert">{error}</Text>
+      {/* The exact surface this whole task exists for: an operator hit this
+          trying to copy an error message and couldn't. Plain Text, no
+          Pressable over it — nothing to fight for the long-press. */}
+      <Text className="mt-1 font-sans text-lead text-alert" selectable>
+        {error}
+      </Text>
     </View>
   );
 }

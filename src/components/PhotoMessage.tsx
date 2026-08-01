@@ -39,7 +39,7 @@ function ShotLine({ shot }: { shot: PhotoBatch["shots"][number] }) {
     // badge, no red, no nag" (Step 11). ink-muted, no icon, no different
     // treatment from any other quiet status line in this app.
     return (
-      <Text className="font-sans text-body text-ink-muted">
+      <Text className="font-sans text-body text-ink-muted" selectable>
         Kept on device · goes when you're back
       </Text>
     );
@@ -50,14 +50,22 @@ function ShotLine({ shot }: { shot: PhotoBatch["shots"][number] }) {
     // Step 11's failure rule is "one sentence with no retry," a calm
     // correction rather than an alarm — a photo that couldn't be read is
     // an everyday outcome (glare, a blurry shot), not a system failure.
+    // Still selectable for the same reason AgentError's alert text is: a
+    // failure message is exactly the thing someone wants to paste elsewhere.
     return (
-      <Text className="font-sans text-body text-ink">
+      <Text className="font-sans text-body text-ink" selectable>
         {shot.errorText ?? "Can't read this one."}
       </Text>
     );
   }
 
-  return <Text className="font-sans text-body text-ink">{shot.extractedText}</Text>;
+  // The extracted read itself — the whole point of the shot. No Pressable
+  // wraps any ShotLine; Undo lives on the header above (see PhotoMessage).
+  return (
+    <Text className="font-sans text-body text-ink" selectable>
+      {shot.extractedText}
+    </Text>
+  );
 }
 
 /**

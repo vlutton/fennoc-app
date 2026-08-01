@@ -169,9 +169,12 @@ function ReplySheetContent({
 
               BriefingSheet already renders the same kind of content through
               MarkdownRenderer, so this is the existing surface, not a new
-              one. Selectability is lost — react-native-markdown-display does
-              not thread it through — which is the one real regression here
-              and worth revisiting if copying replies turns out to matter. */}
+              one. Selectability used to be lost here — react-native-
+              markdown-display's default render rules don't thread it
+              through on their own — but MarkdownRenderer now overrides the
+              leaf text rules to carry `selectable`, so copying a reply
+              works the same as copying any other thread text. See its own
+              comment for the propagation details. */}
           <MarkdownRenderer text={body ?? ""} />
         </ScrollView>
       </View>

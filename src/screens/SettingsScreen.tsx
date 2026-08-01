@@ -228,24 +228,31 @@ export function SettingsScreen() {
           )}
         </Pressable>
 
+        {/* selectable throughout — this is the connection DIAGNOSTIC block,
+            and the "ok"/"error" cases are exactly the kind of text an
+            operator would want to copy out (a status summary, or a real
+            connection failure). None of these Text nodes sit inside a
+            Pressable. */}
         <View className="mt-4 rounded-xl bg-bg-base p-4">
           {connection.kind === "idle" && (
-            <Text className="font-sans text-body text-ink">
+            <Text className="font-sans text-body text-ink" selectable>
               Not tested yet.
             </Text>
           )}
           {connection.kind === "loading" && (
-            <Text className="font-sans text-body text-ink">Checking…</Text>
+            <Text className="font-sans text-body text-ink" selectable>
+              Checking…
+            </Text>
           )}
           {connection.kind === "ok" && (
-            <Text className="font-sans text-body text-ink">
+            <Text className="font-sans text-body text-ink" selectable>
               ✅ Connected — open {connection.status.open} / completed{" "}
               {connection.status.completed} / overdue{" "}
               {connection.status.overdue}
             </Text>
           )}
           {connection.kind === "error" && (
-            <Text className="font-sans text-body text-ink">
+            <Text className="font-sans text-body text-ink" selectable>
               ❌ Failed: {connection.message}
             </Text>
           )}
@@ -337,7 +344,10 @@ export function SettingsScreen() {
           </View>
 
           {devNotifStatus ? (
-            <Text className="mt-3 font-sans text-caption text-ink">
+            // Another diagnostic-text surface (permission/registration
+            // results, including failure reasons) — same rationale as the
+            // connection block above.
+            <Text className="mt-3 font-sans text-caption text-ink" selectable>
               {devNotifStatus}
             </Text>
           ) : null}
