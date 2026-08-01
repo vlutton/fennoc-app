@@ -152,3 +152,44 @@ export function isYesterday(dateKey: string, todayKey: string): boolean {
   if (!target || !today) return false;
   return Math.round((today.getTime() - target.getTime()) / DAY_MS) === 1;
 }
+
+/**
+ * `"15:00 today"` / `"tomorrow 09:00"` / `"09:00 · WED 5"` — a reminder's
+ * `condition_value` (INT-057 commit 3), an ISO 8601 America/Chicago local
+ * datetime the server writes for its only condition type today (`'time'`
+ * — see `fennoc.store.accessors`' `set_down_items` migration comment).
+ * Deliberately asymmetric ("time today" vs. "tomorrow time") rather than
+ * one fixed order for both — that is how the two are actually said out
+ * loud, and the design's own worked examples use exactly this pairing.
+ * Anything past tomorrow falls back to a bare day label, time-first, same
+ * as "today"'s ordering.
+ */
+export function formatReminderWhen(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(parsed);
+
+  const dateKey = chicagoDateKey(iso);
+  const today = chicagoToday();
+  if (dateKey === today) return `${time} today`;
+  if (dateKey === addDaysToDateKey(today, 1)) return `tomorrow ${time}`;
+  return `${time} · ${formatDayLabel(dateKey)}`;
+}
+
+/** `dateKey` shifted by `delta` calendar days, still a bare `YYYY-MM-DD` —
+ *  local helper for `formatReminderWhen`'s "is this tomorrow" check. */
+function addDaysToDateKey(dateKey: string, delta: number): string {
+  const parsed = parseDateKey(dateKey);
+  if (!parsed) return dateKey;
+  const shifted = new Date(parsed.getTime() + delta * DAY_MS);
+  const y = shifted.getFullYear();
+  const m = String(shifted.getMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
