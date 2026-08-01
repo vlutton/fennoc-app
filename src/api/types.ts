@@ -39,27 +39,77 @@ export type AgentMessageCreated = components["schemas"]["AgentMessageCreatedResp
 
 /**
  * One row of a turn's receipt (INT-050) — "what this turn read, wrote, or
- * declined," rendered in the order they happened. Hand-written, not
- * generated: `fennoc-core`'s server team is landing `actions` on
- * `GET /api/message/{id}` (and thread listing) in parallel with this
- * client change, so it isn't in `schema.gen.ts` yet. `AgentMessage` below
- * declares it optional-and-nullable for exactly that reason — until the
- * server ships, every real response simply omits the key, which reads
- * identically to `null` for every consumer in this app (see
- * `qualifiesForReceipt` in components/Receipt.tsx). Re-derive this type
- * from the generated schema (drop this intersection) once
- * `npm run gen:api-schema && npm run gen:api-types` picks up the real field.
+ * declined," rendered in the order they happened.
+ *
+ * `AgentMessageResponse.actions` DID land in the generated schema (this
+ * type used to be added via an intersection because it hadn't yet — see
+ * git history for that version of this comment) but FastAPI/Pydantic only
+ * declares the server field as `list[dict[str, Any]] | null`: a plain
+ * dict, not a sub-model, so `schema.gen.ts` types each item as
+ * `{[key: string]: unknown}`. The literal `kind` union below is still this
+ * app's own knowledge of the closed set of values `fennoc-core` actually
+ * writes (mirrors `fennoc/agent/loop.py`'s `_derive_actions`), same
+ * reasoning as `TaskStatus` further down this file. `AgentMessage` narrows
+ * the generated field to this stricter shape via `Omit`, not intersection,
+ * since the field itself no longer needs adding — only refining.
  */
 export interface AgentAction {
   text: string;
   kind: "write" | "read" | "decline";
 }
 
+/**
+ * One provenance entry (INT-057 commit 2, step 18b) — "answer first,
+ * source underneath." Same "generic dict on the wire, literal shape known
+ * client-side" situation as `AgentAction` above; mirrors
+ * `fennoc/agent/loop.py`'s `_derive_sources` exactly. `turn_id` and
+ * `image_id` are mutually exclusive in practice (a thread-search hit cites
+ * a turn; an image-recall hit cites an image, which has no turn back-
+ * reference to give — see that function's own docstring) but both are
+ * typed nullable rather than as a discriminated union, matching the
+ * server's own untagged shape rather than inventing a tag it doesn't send.
+ */
+export interface AgentSource {
+  turn_id: string | null;
+  image_id: string | null;
+  /** ISO 8601 — the cited turn/image's own `created_at`, used to find which
+   *  rendered day a tapped source belongs to. */
+  ts: string;
+  /** Pre-formatted by the server (`_format_source_label`) — e.g.
+   *  `"MON 27 · 11:52"` or `"MON 27 · 11:52 · FROM THE PHOTO"`. Render
+   *  verbatim; do not reformat client-side. */
+  label: string;
+}
+
 /** GET /api/message/{id} and /api/messages — full `agent_messages` row (INT-029b). */
-export type AgentMessage = components["schemas"]["AgentMessageResponse"] & {
-  /** See `AgentAction`'s own doc comment — not yet in the generated schema. */
-  actions?: AgentAction[] | null;
+export type AgentMessage = Omit<
+  components["schemas"]["AgentMessageResponse"],
+  "actions" | "sources"
+> & {
+  /** See `AgentAction`'s own doc comment. */
+  actions: AgentAction[] | null;
+  /** See `AgentSource`'s own doc comment (INT-057 commit 2). */
+  sources: AgentSource[] | null;
 };
+
+/** One entry in `GET /api/thread`'s `days` array (INT-057 commit 2). */
+export type ThreadDay = Omit<components["schemas"]["ThreadDayResponse"], "turns"> & {
+  turns: AgentMessage[];
+};
+
+/** The overnight-timer resolution card (INT-057 commit 2, step 18a). */
+export type OpenTimerCard = components["schemas"]["OpenTimerCardResponse"];
+
+/** GET /api/thread — the durable thread the app renders (INT-057 commit 2). */
+export type Thread = Omit<components["schemas"]["ThreadResponse"], "days"> & {
+  days: ThreadDay[];
+};
+
+/** POST /api/time/resolve-overnight's response. */
+export type ResolveOvernightResult = components["schemas"]["ResolveOvernightResponse"];
+
+/** GET /api/reminders and the reminder action endpoints' echoed row. */
+export type Reminder = components["schemas"]["ReminderResponse"];
 
 /** POST /api/push/register — echoes back the upserted `device_tokens` row. */
 export type PushRegisterResult = components["schemas"]["PushRegisterResponse"];
@@ -90,6 +140,15 @@ export type ImageUploadResult = components["schemas"]["ImageUploadResponse"];
 // ---------------------------------------------------------------------------
 
 export type TaskStatus = "open" | "completed" | "dropped";
+
+/** `POST /api/time/resolve-overnight`'s `action` field — the server takes a
+ *  plain `string` (`fennoc.thread.resolve_overnight` does its own
+ *  validation), so this closed set is this app's own knowledge, same
+ *  reasoning as `TaskStatus` above. Mirrors the three buttons on the
+ *  overnight card (step 18a): `"done"` closes with a duration, `"keep"`
+ *  leaves the block open, `"bin"` discards the block without touching the
+ *  task. */
+export type ResolveOvernightAction = "done" | "keep" | "bin";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

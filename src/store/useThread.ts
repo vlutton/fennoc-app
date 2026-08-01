@@ -3,30 +3,47 @@ import { useMemo } from "react";
 import { create } from "zustand";
 
 import { deleteImage, formatApiError } from "../api/client";
-import type { AgentAction } from "../api/types";
+import type { AgentAction, AgentSource } from "../api/types";
 
 /**
- * Session-local record of user captures, used only to render the user's
- * own bubbles back into the thread scroll (INT-023b). Also holds the
- * client-side view of an in-flight or finished agent turn (INT-029b) — the
- * `agent` field below — so the thread can show a Fennoc entry immediately
- * on submit and resolve it in place once the server's async turn completes.
+ * The session-local OVERLAY on the durable thread (INT-057 amendment —
+ * this doctrine comment used to describe a store that WAS the thread; it
+ * is now the layer rendered on top of one).
  *
- * This is explicitly NOT the durable thread the backend blueprint proposes
- * (`GET /api/thread` — proposed, unbuilt; see INT-023 intent doc, "1. Where
- * messages come from"). It is deliberately:
- *   - in-memory only, no `persist` middleware — nothing here survives an
- *     app restart, and
- *   - filtered to the local calendar day on read (`useTodayCaptures`), so
- *     a session that happens to straddle midnight can't leak yesterday's
- *     bubbles into today's thread.
+ * `GET /api/thread` (see `../hooks/useThreadQuery`'s `useThread`) is the
+ * durable record now: every day's turns, oldest→newest, collapsed
+ * summaries for anything older than the live window. This store no longer
+ * pretends to be that — it holds only what is genuinely session-local and
+ * has no server row (yet, or ever):
  *
- * A real, durable, multi-device thread store is a later increment. Do not
- * mistake this for it, and do not add `persist` here to "fix" the
- * bounded-to-today behaviour — that would change what this is. The `agent`
- * entries are exactly as session-local and non-durable as everything else
- * here: a poll started this session resolves this session, and a restart
- * loses the pending state along with the rest of the thread.
+ *   - `captures`: a just-typed message's bubble, an in-flight agent turn's
+ *     "Thinking…" placeholder and its resolution (INT-029b), a photo
+ *     batch mid-upload, a check-in reply's local echo. ThreadScreen merges
+ *     these onto the server's TODAY day, deduping any capture that
+ *     already has a matching server turn (by `agent.messageId` — see
+ *     ThreadScreen's merge function for the exact rule; a local entry
+ *     with no message id, e.g. a plain typed bubble or a photo batch, has
+ *     nothing to dedupe against and is always shown).
+ *   - `replyingTo` / `receiptExpanded`: pure UI state, always were.
+ *   - `expandedDays`: NEW for INT-057 — which collapsed days the user has
+ *     tapped open this session (see `expandDay` below). Session-local by
+ *     design, same as everything else here: the server's `?expand=`
+ *     parameter is how a day's turns actually get fetched, and this store
+ *     only remembers which dates to keep asking for as the thread
+ *     re-renders and refetches.
+ *
+ * Still explicitly in-memory only, no `persist` middleware — nothing here
+ * survives an app restart, and the design doc's own note (INT-057's "What
+ * this amends") is explicit that this stays true even though the store's
+ * ROLE changed: "do not add `persist` here to 'fix' the bounded-to-today
+ * behaviour" now reads as "do not add `persist` here, full stop" — the
+ * durable thread already persists; this store never needs to.
+ *
+ * `captures` stays filtered to the local calendar day on read
+ * (`useTodayCaptures`) for the same reason as before: a session that
+ * happens to straddle midnight can't leak yesterday's bubbles into
+ * today's overlay — every local capture is created "now", so this mostly
+ * guards that one edge case rather than doing real filtering work.
  */
 export interface ThreadCapture {
   id: string;
@@ -48,6 +65,11 @@ export interface ThreadCapture {
      * one place that decides whether this is enough to show anything.
      */
     actions: AgentAction[] | null;
+    /** The turn's provenance rows (INT-057 commit 2) — same "null until
+     *  `done`" convention as `actions` above. Threaded through here so a
+     *  turn resolved THIS session shows its source chips immediately,
+     *  without waiting on the next `GET /api/thread` poll to pick it up. */
+    sources: AgentSource[] | null;
   };
   /**
    * Present only on Fennoc entries produced by the photo-capture hot path
@@ -179,6 +201,8 @@ interface ThreadState {
       state: "done" | "error";
       /** Omit for an error resolution — there is no turn to report a receipt for. */
       actions?: AgentAction[] | null;
+      /** Omit for an error resolution, same reasoning as `actions` above. */
+      sources?: AgentSource[] | null;
     },
   ) => void;
   /** What the composer is currently answering, for the quoted strip above it.
@@ -197,6 +221,20 @@ interface ThreadState {
    */
   receiptExpanded: Record<string, boolean>;
   toggleReceiptExpanded: (messageId: string) => void;
+
+  /**
+   * Which collapsed days (INT-057, keyed by `YYYY-MM-DD`) the user has
+   * tapped open this session. One-directional on purpose — there is no
+   * `collapseDay`: the design's "tap expands it in place... nothing is
+   * deleted, ever" has no matching "re-collapse" affordance, so this store
+   * doesn't invent an un-expand action nothing calls. Session-local, same
+   * as `receiptExpanded` above: a day expanded this session re-collapses
+   * on the next cold start, and the user just taps it open again — cheap,
+   * and consistent with every other piece of expansion state in this file
+   * never surviving a restart.
+   */
+  expandedDays: Record<string, boolean>;
+  expandDay: (dateKey: string) => void;
 
   /**
    * Start a new photo-batch thread entry with its first shot. Called once
@@ -241,7 +279,7 @@ export const useThreadStore = create<ThreadState>()((set, get) => ({
         ...state.captures,
         {
           ...entry("", "fennoc"),
-          agent: { messageId, state: "thinking", body: null, actions: null },
+          agent: { messageId, state: "thinking", body: null, actions: null, sources: null },
         },
       ],
     })),
@@ -257,6 +295,7 @@ export const useThreadStore = create<ThreadState>()((set, get) => ({
                 body: result.body,
                 state: result.state,
                 actions: result.actions ?? null,
+                sources: result.sources ?? null,
               },
             }
           : c,
@@ -273,6 +312,14 @@ export const useThreadStore = create<ThreadState>()((set, get) => ({
         [messageId]: !state.receiptExpanded[messageId],
       },
     })),
+
+  expandedDays: {},
+  expandDay: (dateKey) =>
+    set((state) =>
+      state.expandedDays[dateKey]
+        ? state
+        : { expandedDays: { ...state.expandedDays, [dateKey]: true } },
+    ),
 
   addPhotoBatch: (batchId, firstShot) =>
     set((state) => {

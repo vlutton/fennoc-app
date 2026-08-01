@@ -28,6 +28,7 @@ import Animated, {
 
 import { useTheme } from "../theme/useTheme";
 import { LedgerBriefingsSection } from "./LedgerBriefingsSection";
+import { LedgerRemindersSection } from "./LedgerRemindersSection";
 import { LedgerSearchResults } from "./LedgerSearchResults";
 import { LedgerTasksSection } from "./LedgerTasksSection";
 import { LedgerTimeSection } from "./LedgerTimeSection";
@@ -37,11 +38,15 @@ interface LedgerSheetProps {
   onClose: () => void;
 }
 
-type SectionId = "tasks" | "time" | "briefings";
+type SectionId = "tasks" | "time" | "reminders" | "briefings";
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: "tasks", label: "Tasks" },
   { id: "time", label: "Time" },
+  // INT-057 commit 3: OPEN REMINDERS. Placed after Time, before Briefings —
+  // reminders are an active, actionable list (closer in kind to Tasks/Time)
+  // rather than an archive (Briefings), so it sits with the former group.
+  { id: "reminders", label: "Reminders" },
   { id: "briefings", label: "Briefings" },
 ];
 
@@ -321,6 +326,18 @@ function LedgerSheetContent({
                 </View>
                 <View className="mb-6" onLayout={onSectionLayout("time")}>
                   <LedgerTimeSection />
+                </View>
+                {/* Deliberately no `onLayout={onSectionLayout("reminders")}`
+                    here, unlike the three sections above it: `onPressSection`
+                    already no-ops gracefully when a section has no recorded
+                    offset (see its `if (y !== undefined)` guard), so the
+                    Reminders pill still renders and is tappable without
+                    wiring it into pill-jump/scrollspy — it simply won't
+                    scroll-to or highlight on tap. The section renders in
+                    normal document flow regardless; free-scrolling past it
+                    works exactly like any other content. */}
+                <View className="mb-6">
+                  <LedgerRemindersSection />
                 </View>
                 <View onLayout={onSectionLayout("briefings")}>
                   <LedgerBriefingsSection />

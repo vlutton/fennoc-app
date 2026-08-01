@@ -1,6 +1,7 @@
 /**
  * The "doorbell" — turning a data-only server push into a real local
- * notification (INT-020 follow-on).
+ * notification (INT-020 follow-on; background delivery added for the
+ * "blank notification" fix, Aug 2026).
  *
  * WHY the server sends no content: Expo relays pushes through FCM/APNs, and
  * no user content may pass through either — Fennoc's replies are private.
@@ -22,12 +23,33 @@
  * sync" comments below), not by importing from it, so this module can never
  * be blamed for changing that file's already-verified dev behaviour.
  *
- * THE LOOP GUARD (read this before touching `isDoorbellPayload`):
+ * TWO SUBSCRIBERS, ONE HANDLER: `handleDoorbellNotification` below is the
+ * entire "fetch by id, post locally" flow, and it is the only place that
+ * flow is written. It has two callers:
+ *
+ *   1. `subscribeToDoorbellNotifications` — `addNotificationReceivedListener`,
+ *      which only runs while the app's JS engine is alive (foreground or
+ *      backgrounded-but-not-killed). This is the original INT-020 path.
+ *   2. The `TaskManager.defineTask` block below, registered via
+ *      `Notifications.registerTaskAsync` — runs even when the app process
+ *      was killed, per expo-notifications' "headless background
+ *      notification" mechanism (see the long comment above that block for
+ *      exactly how the OS invokes it and what shape the payload arrives
+ *      in). This is what was missing: a force-stopped app previously
+ *      dropped every doorbell silently.
+ *
+ * Both parse whatever raw `data` they were handed down to the same
+ * `DoorbellPayload` via `toDoorbellPayload` (below), and both feed the
+ * result to the same `handleDoorbellNotification` — so the fetch-and-post
+ * behaviour, the "don't fake content on failure" rule, and the loop guard
+ * are each written exactly once.
+ *
+ * THE LOOP GUARD (read this before touching `toDoorbellPayload`):
  * `handleDoorbellNotification` below POSTS a local notification, which
- * means `Notifications.addNotificationReceivedListener` — the very listener
- * this module installs — WILL fire again for the notification this module
- * just created. If that second firing were mistaken for another doorbell,
- * it would fetch and post again, forever.
+ * means both subscribers above — the very listener/task this module
+ * installs — WILL fire again for the notification this module just
+ * created. If that second firing were mistaken for another doorbell, it
+ * would fetch and post again, forever.
  *
  * The discriminator is `v`, the schema version the SERVER stamps on every
  * doorbell (see `_DATA_SCHEMA_VERSION` in fennoc-core's
@@ -43,22 +65,21 @@
  * obviously correct in isolation, and would silently build an infinite
  * loop. Requiring an affirmative server marker makes it safe instead.
  *
- * So: `id` may be added to locally-posted data freely. `v` may not.
+ * So: `id` may be added to locally-posted data freely. `v` may not. This is
+ * exactly as true for the background task's payload as for the foreground
+ * listener's — see `toDoorbellPayload`, the one place both normalize down
+ * to a `DoorbellPayload` and the one place the guard is actually enforced.
  *
- * KNOWN LIMITATION — force-stopped app: this module relies on
- * `expo-notifications`' JS event listener, which only runs while the app
- * process is alive (foreground or backgrounded-but-not-killed). A
- * force-stopped app cannot process a doorbell at all — the data-only push
- * arrives, nothing is listening, and no local notification is ever posted.
- * Fixing that needs a native background task (`expo-task-manager`'s
- * `Notifications.registerTaskAsync` background handler), which is a new
- * native module — explicitly out of scope here because this change ships
- * as an over-the-air EAS Update onto an already-built APK, and a new native
- * module cannot be delivered that way. Do not attempt a JS-only workaround;
- * there isn't one. This is a "needs a new build" gap, not a bug in this
- * file.
+ * This module also exports `isServerEnvelope` (a thin wrapper around the
+ * same `v`-presence check) for `handler.ts`'s `handleNotification` to use —
+ * that is the OTHER half of the blank-notification fix: suppressing the
+ * server's raw pointer from ever being shown as-is, foreground or not, so
+ * only doorbell's own local reposts (real content, no `v`) render. See
+ * handler.ts for why that is a separate concern from this file's fetch-and-
+ * post flow.
  */
 import * as Notifications from "expo-notifications";
+import * as TaskManager from "expo-task-manager";
 
 import { formatApiError, getAgentMessage } from "../api/client";
 import { CHANNEL_IDS, type ChannelId } from "./channels";
@@ -72,31 +93,122 @@ interface DoorbellPayload {
 }
 
 /**
- * Narrows an unknown notification `data` payload to a doorbell. Deliberately
- * defensive rather than a cast: `data` is untrusted input off the network
- * (Expo → FCM/APNs → device), and a malformed or unrelated payload (or,
- * critically, a notification this module itself just posted — see the
- * module docstring's loop-guard section) must fall through as "not a
- * doorbell," never throw.
+ * Validates and normalizes a flat `{channel, id, v}` record into a
+ * `DoorbellPayload`. Deliberately defensive rather than a cast: the input
+ * is untrusted off the network (Expo → FCM/APNs → device), and a malformed
+ * or unrelated payload (or, critically, a notification this module itself
+ * just posted — see the module docstring's loop-guard section) must fall
+ * through as "not a doorbell," never throw.
+ *
+ * `v` is accepted as either a real `number` or a numeric STRING. The
+ * foreground listener's `notification.request.content.data` (see
+ * `parseForegroundDoorbell` below) always hands this a real number —
+ * expo-notifications has already parsed it by the time JS sees it. The
+ * background task's raw payload (see `parseBackgroundDoorbell`) is not
+ * guaranteed that: a data-only FCM message is natively a map of STRINGS,
+ * and while this app's actual delivery path (Expo's push service, see
+ * registration.ts) re-encodes the whole `data` object as real JSON before
+ * the device ever sees it — so `v` does arrive as a number there too in
+ * practice — nothing prevents a future direct-FCM path from handing this a
+ * string "1" instead. Coercing here, once, means the loop guard holds
+ * either way instead of silently failing closed against a numeric string.
  */
-function isDoorbellPayload(data: unknown): data is DoorbellPayload {
-  if (typeof data !== "object" || data === null) return false;
-  const record = data as Record<string, unknown>;
-
+function toDoorbellPayload(record: Record<string, unknown>): DoorbellPayload | null {
   const channel = record.channel;
   const id = record.id;
   // `v` is the server's schema stamp and the actual loop guard — see the
   // module docstring. Checked first because it is the one condition that
   // cannot be satisfied by anything this app posts itself.
-  const version = record.v;
+  const rawVersion = record.v;
+  const version =
+    typeof rawVersion === "number"
+      ? rawVersion
+      : typeof rawVersion === "string"
+        ? Number(rawVersion)
+        : NaN;
 
-  return (
-    typeof version === "number" &&
-    typeof channel === "string" &&
-    (CHANNEL_IDS as string[]).includes(channel) &&
-    typeof id === "string" &&
-    id.length > 0
-  );
+  if (
+    !Number.isFinite(version) ||
+    typeof channel !== "string" ||
+    !(CHANNEL_IDS as string[]).includes(channel) ||
+    typeof id !== "string" ||
+    id.length === 0
+  ) {
+    return null;
+  }
+
+  return { channel: channel as ChannelId, id, v: version };
+}
+
+/** True when `data` carries the server's schema stamp `v` at all — the
+ *  same discriminator `toDoorbellPayload` uses for the loop guard (see the
+ *  module docstring). Exported for handler.ts's `handleNotification`,
+ *  which needs only "is this the server's raw pointer envelope," not a
+ *  fully validated `DoorbellPayload` (a malformed-but-`v`-bearing payload
+ *  should still be suppressed as a would-be pointer, not shown blank). */
+export function isServerEnvelope(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  return (data as Record<string, unknown>).v !== undefined;
+}
+
+/**
+ * Parses the foreground listener's already-normalized notification data
+ * (`notification.request.content.data`) into a `DoorbellPayload`.
+ */
+function parseForegroundDoorbell(data: unknown): DoorbellPayload | null {
+  if (typeof data !== "object" || data === null) return null;
+  return toDoorbellPayload(data as Record<string, unknown>);
+}
+
+/**
+ * Parses the background task's raw notification data into a
+ * `DoorbellPayload`.
+ *
+ * This app receives pushes through Expo's push service (see
+ * registration.ts's `getExpoPushTokenAsync`), which relays through
+ * FCM/APNs as a headless data-only message whose native "body" field
+ * carries the FULL Expo push message (title/body/data/...) JSON-encoded.
+ * expo-notifications' native background-task bridge re-exposes that exact
+ * string as `data.dataString` — verified by reading
+ * `RemoteMessageSerializer.java`'s `toBundle` (Android) and
+ * `BackgroundEventTransformer.swift` (iOS) in the installed
+ * expo-notifications@57.0.7 package, and confirmed by the SDK's own
+ * documented background-task example, which does
+ * `JSON.parse(data.dataString)` and then reads `.title` / `.data` off the
+ * result. So this doorbell's `{channel, id, v}` fields live at
+ * `JSON.parse(dataString).data` — one level deeper than the foreground
+ * listener's already-unwrapped `notification.request.content.data`.
+ *
+ * `dataString` would be absent for a push that reached the device WITHOUT
+ * going through that Expo relay. There is no such path in this app today —
+ * `registerPushTokenAsync` only ever requests an Expo token — but "today"
+ * is doing a lot of work in that sentence, so this falls back to treating
+ * the raw record's own top-level fields as the candidate, flat, rather
+ * than returning null outright if that ever changes.
+ */
+function parseBackgroundDoorbell(data: unknown): DoorbellPayload | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as Record<string, unknown>;
+
+  if (typeof record.dataString === "string") {
+    try {
+      const expoMessage: unknown = JSON.parse(record.dataString);
+      if (typeof expoMessage === "object" && expoMessage !== null) {
+        const nested = (expoMessage as Record<string, unknown>).data;
+        if (typeof nested === "object" && nested !== null) {
+          const parsed = toDoorbellPayload(nested as Record<string, unknown>);
+          if (parsed) return parsed;
+        }
+      }
+    } catch {
+      // Malformed dataString — fall through to the flat record below rather
+      // than throwing out of a background task. Same "fail closed, log
+      // don't throw" posture as handleDoorbellNotification's own catch
+      // blocks below.
+    }
+  }
+
+  return toDoorbellPayload(record);
 }
 
 // iOS interruption levels. Kept in sync BY HAND with the identical table in
@@ -162,6 +274,13 @@ async function postLocalNotificationAsync(
 
 /**
  * Handles one validated doorbell: fetch the real content, post it locally.
+ * Shared verbatim by both subscribers — see the module docstring's "TWO
+ * SUBSCRIBERS, ONE HANDLER" section.
+ *
+ * Returns whether it actually posted a local notification. The foreground
+ * subscriber ignores this (it's fire-and-forget, same as before); the
+ * background task uses it to report an honest
+ * `BackgroundNotificationTaskResult` (`NewData` vs `NoData`) back to the OS.
  *
  * On fetch failure — network error, non-2xx, or the row not actually having
  * content yet (`status === "error"`, or `reply_lede` still null because the
@@ -171,9 +290,11 @@ async function postLocalNotificationAsync(
  * — worse than staying silent, because the user has no way to tell a real
  * doorbell from a broken one. A silent miss just means one tap on the app
  * would have shown nothing new yet; that's the safe failure mode, so this
- * only logs a warning and returns.
+ * only logs a warning and returns `false` — never throws, which matters
+ * doubly for the background task: an uncaught rejection there has no UI to
+ * surface it to, and no retry loop should be built out of it either.
  */
-async function handleDoorbellNotification(payload: DoorbellPayload): Promise<void> {
+async function handleDoorbellNotification(payload: DoorbellPayload): Promise<boolean> {
   let message;
   try {
     message = await getAgentMessage(payload.id);
@@ -184,7 +305,7 @@ async function handleDoorbellNotification(payload: DoorbellPayload): Promise<voi
       payload.id,
       formatApiError(error),
     );
-    return;
+    return false;
   }
 
   if (message.status === "error" || !message.reply_lede) {
@@ -197,7 +318,7 @@ async function handleDoorbellNotification(payload: DoorbellPayload): Promise<voi
       payload.id,
       message.status,
     );
-    return;
+    return false;
   }
 
   const { title, body } = toNotificationText(
@@ -206,6 +327,7 @@ async function handleDoorbellNotification(payload: DoorbellPayload): Promise<voi
     message.reply_body,
   );
   await postLocalNotificationAsync(payload.channel, title, body);
+  return true;
 }
 
 /** Short, human titles per channel, used when the message has no usable one. */
@@ -269,11 +391,15 @@ export function toNotificationText(
  * doorbell pushes into real local notifications. Returns an unsubscribe
  * function; call once near the app root (see `initNotifications` in
  * index.ts) and clean up on unmount.
+ *
+ * This is subscriber #1 of 2 — see the module docstring's "TWO
+ * SUBSCRIBERS, ONE HANDLER" section. It only runs while the app's JS
+ * engine is alive; subscriber #2, below, is what covers a killed app.
  */
 export function subscribeToDoorbellNotifications(): () => void {
   const subscription = Notifications.addNotificationReceivedListener((notification) => {
-    const data: unknown = notification.request.content.data;
-    if (!isDoorbellPayload(data)) {
+    const payload = parseForegroundDoorbell(notification.request.content.data);
+    if (!payload) {
       // Not a doorbell — most commonly this IS the received-event for a
       // notification this module (or devTrigger) just posted locally. See
       // the module docstring's loop-guard section for why that's expected
@@ -281,8 +407,122 @@ export function subscribeToDoorbellNotifications(): () => void {
       return;
     }
 
-    void handleDoorbellNotification(data);
+    void handleDoorbellNotification(payload);
   });
 
   return () => subscription.remove();
+}
+
+/**
+ * The background doorbell task — subscriber #2 of 2 (see the module
+ * docstring's "TWO SUBSCRIBERS, ONE HANDLER" section). This is what a
+ * force-stopped or never-yet-launched app was missing: `expo-notifications`'
+ * JS event listeners (subscriber #1, above) only run while the app process
+ * is alive, so a doorbell arriving while the app was killed previously had
+ * nothing listening for it at all — the data-only push arrived, and no
+ * local notification was ever posted. Silently. Forever, for that push.
+ *
+ * HOW THIS RUNS WHEN THE APP IS KILLED (expo-task-manager@57.0.7 +
+ * expo-notifications@57.0.7 docs, `docs.expo.dev/versions/v57.0.0`): when a
+ * headless background notification (data-only, no `title`/`body` at the
+ * native level — exactly this app's server envelope) arrives for a
+ * terminated app, the OS asks Expo's native module to spin up the JS
+ * engine, require the SAME main bundle a normal launch would (no views are
+ * mounted — nothing here can assume `App.tsx` has rendered, or that
+ * anything React-related is available), run the task registered under
+ * `BACKGROUND_DOORBELL_TASK`, and then shut back down. `TaskManager.
+ * defineTask` — the call below — MUST therefore execute during that bundle
+ * evaluation regardless of whether any component ever mounts. It is called
+ * here, at MODULE scope (never inside a function/effect/component — the
+ * docs are explicit that a lifecycle-method call site does not work), and
+ * this module is reachable from `index.ts` via a plain, unconditional
+ * import chain (index.ts → App.tsx → src/notifications → this file), which
+ * is what actually satisfies "required early" — ES module imports evaluate
+ * a module's top-level code before the importing module's own function
+ * bodies run, so this `defineTask` call has already executed by the time
+ * `index.ts`'s `registerRootComponent(App)` line runs, let alone by the
+ * time anything renders.
+ *
+ * `Notifications.registerTaskAsync(BACKGROUND_DOORBELL_TASK)` is the OTHER
+ * required half — it tells the native side which defined task to actually
+ * invoke for notification events — and is called from
+ * `registerDoorbellBackgroundTaskAsync` below, from `initNotifications` in
+ * index.ts, next to `configureNotificationHandler()`. Unlike `defineTask`,
+ * that call has no module-scope restriction; it only needs to run once,
+ * early, same as the channel/category registration it sits beside.
+ *
+ * SDK 57 CAVEATS surfaced while reading the docs (not just skimmed):
+ *
+ * - iOS requires `UIBackgroundModes: ["remote-notification"]` in
+ *   Info.plist for a headless push to wake a killed app at all — set via
+ *   `enableBackgroundRemoteNotifications: true` on the `expo-notifications`
+ *   config plugin in app.json (added alongside this file). Without it this
+ *   entire task is unreachable on iOS.
+ * - This is `expo-task-manager`, a NEW native module this app didn't
+ *   depend on before — it cannot be delivered as an over-the-air EAS
+ *   Update onto an already-built binary; it requires a new build (a
+ *   `runtimeVersion` bump — see app.json's own comment on the identical
+ *   reasoning from the speech-recognition build).
+ * - Unavailable in Expo Go on Android, and does not support real
+ *   background execution on iOS there either — a development build is
+ *   required to exercise this at all (matches this app's existing
+ *   `expo-dev-client` dependency, so no new constraint in practice).
+ * - The OS may simply decline to deliver a headless notification at all
+ *   (Android Doze mode; Apple's own guidance caps "two or three per hour").
+ *   There is no client-side mitigation for that — it's an OS policy, not a
+ *   bug in this file.
+ * - `console.log` output from inside the task body is not reliably visible
+ *   depending on platform/app state (per the docs) — `console.warn` calls
+ *   below are diagnostic best-effort, not something to depend on seeing.
+ */
+const BACKGROUND_DOORBELL_TASK = "fennoc-background-doorbell";
+
+TaskManager.defineTask<Notifications.NotificationTaskPayload>(
+  BACKGROUND_DOORBELL_TASK,
+  async ({ data: taskPayload, error }) => {
+    if (error) {
+      console.warn("[notifications] background doorbell task reported an error:", error);
+      return Notifications.BackgroundNotificationTaskResult.Failed;
+    }
+
+    if (!taskPayload || "actionIdentifier" in taskPayload) {
+      // Either nothing came through, or this is a `NotificationResponse`
+      // (the user tapped an action button while the app was backgrounded/
+      // terminated — Android only, per `registerTaskAsync`'s own doc).
+      // Routing THAT into a checkin reply etc. is handler.ts's job when the
+      // JS response listener is alive; wiring the equivalent for a killed
+      // app is a real gap but a different one from the doorbell fix this
+      // task exists for, so it's deliberately left alone here rather than
+      // half-built inside a module about something else.
+      return Notifications.BackgroundNotificationTaskResult.NoData;
+    }
+
+    const payload = parseBackgroundDoorbell(taskPayload.data);
+    if (!payload) {
+      return Notifications.BackgroundNotificationTaskResult.NoData;
+    }
+
+    const posted = await handleDoorbellNotification(payload);
+    return posted
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
+  },
+);
+
+/**
+ * Registers the background doorbell task with the native side (the
+ * `Notifications.registerTaskAsync` half of the wiring described in the
+ * long comment above `BACKGROUND_DOORBELL_TASK`). Call once near the app
+ * root, alongside `configureNotificationHandler()` — see `initNotifications`
+ * in index.ts. Never throws: a failure here (e.g. `TaskManager` genuinely
+ * unavailable — Expo Go on Android, or web) degrades to "background
+ * doorbells silently don't work," which is exactly the pre-existing
+ * behaviour this change is additive to, not a reason to block app startup.
+ */
+export async function registerDoorbellBackgroundTaskAsync(): Promise<void> {
+  try {
+    await Notifications.registerTaskAsync(BACKGROUND_DOORBELL_TASK);
+  } catch (error) {
+    console.warn("[notifications] registering background doorbell task failed:", error);
+  }
 }

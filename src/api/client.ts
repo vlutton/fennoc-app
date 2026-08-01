@@ -20,8 +20,12 @@ import type {
   OpenTimer,
   PendingCheckin,
   PushRegisterResult,
+  Reminder,
+  ResolveOvernightAction,
+  ResolveOvernightResult,
   Status,
   Task,
+  Thread,
   TimeBlock,
   TimeStartOpts,
 } from "./types";
@@ -226,6 +230,60 @@ export async function sendAgentMessage(text: string): Promise<AgentMessageCreate
 
 export async function getAgentMessage(id: string): Promise<AgentMessage> {
   return request<AgentMessage>("GET", `/api/message/${id}`);
+}
+
+/**
+ * GET /api/thread (INT-057 commit 2) — the durable thread. `expand` is
+ * repeatable per the server's contract (`?expand=YYYY-MM-DD&expand=...`,
+ * a plain `list[str]` FastAPI param read via Starlette's `getlist()`,
+ * which matches on repeated identical keys — NOT bracket notation).
+ *
+ * `paramsSerializer: { indexes: null }` is required here: verified by
+ * hand (axios's default array serialization) that plain `{ params: {
+ * expand } }` renders `expand[]=2026-07-29&expand[]=2026-07-28`, which
+ * Starlette does not recognize as the same query param at all — the
+ * server would silently see an empty `expand` list. `{ indexes: null }`
+ * is axios 1.x's documented option for "no brackets, just repeat the key."
+ */
+export async function getThread(expand: string[] = []): Promise<Thread> {
+  return request<Thread>("GET", "/api/thread", undefined, {
+    params: expand.length > 0 ? { expand } : undefined,
+    paramsSerializer: { indexes: null },
+  });
+}
+
+/**
+ * POST /api/time/resolve-overnight — the overnight card's three actions
+ * (step 18a). `minutes` is omitted for `"keep"`/`"bin"` (meaningless for
+ * either) and for `"done"` when the user accepts the server's own
+ * suggested duration rather than typing one in — this app's overnight card
+ * never offers a custom-duration input (three fixed buttons per the
+ * design), so every `"done"` call in practice omits `minutes` and lets the
+ * server apply `suggested_minutes` itself.
+ */
+export async function resolveOvernight(
+  blockId: string,
+  action: ResolveOvernightAction,
+  minutes?: number,
+): Promise<ResolveOvernightResult> {
+  return request<ResolveOvernightResult>("POST", "/api/time/resolve-overnight", {
+    block_id: blockId,
+    action,
+    minutes,
+  });
+}
+
+/** GET /api/reminders — every open (not yet closed) reminder for the ledger's
+ *  OPEN REMINDERS group. `owner` defaults server-side to "vince", same
+ *  single-user assumption `registerPushToken` already documents. */
+export async function getReminders(): Promise<Reminder[]> {
+  return request<Reminder[]>("GET", "/api/reminders");
+}
+
+/** POST /api/reminder/{id}/done — idempotent server-side (see the endpoint's
+ *  own docstring); safe to call again if a retry double-fires. */
+export async function reminderDone(id: string): Promise<Reminder> {
+  return request<Reminder>("POST", `/api/reminder/${id}/done`);
 }
 
 /**

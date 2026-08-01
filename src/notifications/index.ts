@@ -1,7 +1,7 @@
 /**
  * INT-020 notification layer — barrel + one-shot init.
  *
- * `initNotifications()` does the four things that must happen once, early,
+ * `initNotifications()` does the five things that must happen once, early,
  * regardless of permission state (channel/category registration is not
  * gated on permission — Android lets you create channels before the user
  * has granted POST_NOTIFICATIONS, and doing so early means the channel
@@ -12,17 +12,22 @@
  *   2. Register the four notification categories/actions (iOS + Android).
  *   3. Install the foreground handler, the response (tap/action) listener,
  *      and the doorbell (data-only push → local notification) listener.
+ *   4. Register the background doorbell task with the native side — the
+ *      `Notifications.registerTaskAsync` half of the fix for a killed app
+ *      never processing a doorbell; `TaskManager.defineTask` itself runs
+ *      at module scope in doorbell.ts (see its own long comment on why it
+ *      has to be there, not here).
  *
  * It deliberately does NOT request permission — see permissions.ts for why,
  * and where that call belongs instead.
  *
- * It DOES, as a fourth step, opportunistically re-register the push token
+ * It DOES, as a final step, opportunistically re-register the push token
  * — see the comment above that block for why that's not a contradiction of
  * the "no permission prompt" rule above.
  */
 import { registerNotificationCategoriesAsync } from "./categories";
 import { registerNotificationChannelsAsync } from "./channels";
-import { subscribeToDoorbellNotifications } from "./doorbell";
+import { registerDoorbellBackgroundTaskAsync, subscribeToDoorbellNotifications } from "./doorbell";
 import {
   configureNotificationHandler,
   subscribeToNotificationResponses,
@@ -40,7 +45,7 @@ export {
   ACTION_SWITCH,
 } from "./categories";
 export { triggerDevNotificationAsync } from "./devTrigger";
-export { subscribeToDoorbellNotifications } from "./doorbell";
+export { registerDoorbellBackgroundTaskAsync, subscribeToDoorbellNotifications } from "./doorbell";
 export { requestNotificationPermissionAsync } from "./permissions";
 export { registerPushTokenAsync, type RegistrationResult } from "./registration";
 
@@ -48,12 +53,17 @@ export { registerPushTokenAsync, type RegistrationResult } from "./registration"
  * Call once near the app root (see App.tsx). Returns a single unsubscribe
  * function composing both the response listener and the doorbell listener
  * — callers get one handle to clean up on unmount, same contract as before
- * this module had two listeners to manage.
+ * this module had two listeners to manage. The background task has no
+ * unsubscribe of its own to compose here: `registerTaskAsync` registers
+ * the task with the OS for the lifetime of the install, same as the
+ * channel/category registration above it — there is no per-mount teardown
+ * for any of those three.
  */
 export async function initNotifications(): Promise<() => void> {
   configureNotificationHandler();
   const unsubscribeResponses = subscribeToNotificationResponses();
   const unsubscribeDoorbell = subscribeToDoorbellNotifications();
+  void registerDoorbellBackgroundTaskAsync();
   const unsubscribe = () => {
     unsubscribeResponses();
     unsubscribeDoorbell();
