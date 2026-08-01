@@ -317,6 +317,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reminders Endpoint
+         * @description Every open (not yet closed) reminder for *owner* -- fired-and-waiting
+         *     or not-yet-due alike. The future ledger's SET DOWN group reads this same
+         *     accessor (``list_open_set_down_items``).
+         */
+        get: operations["list_reminders_endpoint_api_reminders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reminder/{reminder_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reminder Done Endpoint
+         * @description Close a reminder as done -- the shade's (or a conversational) "done
+         *     with that" action. Idempotent at the accessor level; the second call
+         *     against an already-closed id still returns the (unchanged) row rather
+         *     than erroring, since "mark it done" twice is not a conflict worth
+         *     surfacing to a client that may have retried a flaky request.
+         */
+        post: operations["reminder_done_endpoint_api_reminder__reminder_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reminder/{reminder_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reminder Snooze Endpoint
+         * @description Reschedule a fired-but-unanswered reminder -- reuses
+         *     ``fennoc.reminders.parse_when``, the exact grammar
+         *     ``fennoc_set_reminder`` uses at creation, so "snooze until 6" means the
+         *     same thing in both places. A snooze into quiet hours is refused the same
+         *     way creation is: one line, with the alternative, never silently pushed
+         *     past it.
+         */
+        post: operations["reminder_snooze_endpoint_api_reminder__reminder_id__snooze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/image": {
         parameters: {
             query?: never;
@@ -430,6 +501,15 @@ export interface paths {
          *     unscoped-by-user read/write already in this file, and inventing a
          *     scoping scheme just for this one DELETE would be false safety: the GET
          *     side of the same row is already unscoped.
+         *
+         *     **INT-042 commit 2 extends this.** A routed image whose route created a
+         *     task (the obligation route — see ``fennoc.capture.routing``) records
+         *     that fact in ``images.route_effect``. Deleting the image now also drops
+         *     the task it created, before deleting the row — so the photo's Undo
+         *     undoes the route's action too (hard constraint: "nothing acts without
+         *     telling you" implies its corollary, "nothing an Undo can't also
+         *     undo"). Looked up before the row is gone, since ``get_image`` after
+         *     ``delete_image`` would find nothing.
          */
         delete: operations["delete_image_endpoint_api_image__image_id__delete"];
         options?: never;
@@ -482,6 +562,59 @@ export interface paths {
         get: operations["list_agent_messages_endpoint_api_messages_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/thread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thread Endpoint
+         * @description The durable thread (INT-057): a few days live, older days collapsed
+         *     to one deterministic line each, day-expansion via repeatable
+         *     ``?expand=YYYY-MM-DD``.
+         *
+         *     ``days`` is ordered oldest -> newest (today last), covering the live
+         *     window (today + the 2 prior days, always present even with zero turns
+         *     -- 18a: "you land at today") plus any older day that holds at least one
+         *     turn, back to a ~30-day cap. Turn shape matches ``GET /api/messages``
+         *     items exactly (both go through ``_agent_message_to_response``) so a
+         *     client renders either source identically.
+         */
+        get: operations["get_thread_endpoint_api_thread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/time/resolve-overnight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Overnight Endpoint
+         * @description The overnight-timer resolution (step 18a): done / keep / bin.
+         *
+         *     See ``fennoc.thread.resolve_overnight`` for what each action does --
+         *     this endpoint is only the HTTP mapping (``OvernightResolutionError`` ->
+         *     the status code it already carries).
+         */
+        post: operations["resolve_overnight_endpoint_api_time_resolve_overnight_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -572,6 +705,10 @@ export interface components {
             trigger: string | null;
             /** Actions */
             actions: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Sources */
+            sources: {
                 [key: string]: unknown;
             }[] | null;
         };
@@ -748,6 +885,22 @@ export interface components {
             ok: boolean;
         };
         /**
+         * OpenTimerCardResponse
+         * @description The overnight-timer resolution card (step 18a) -- present on
+         *     ``GET /api/thread`` only when an open time block has survived the
+         *     06:30 America/Chicago boundary (``fennoc.thread.detect_overnight_timer``).
+         */
+        OpenTimerCardResponse: {
+            /** Block Id */
+            block_id: string;
+            /** Label */
+            label: string;
+            /** Started At */
+            started_at: string;
+            /** Suggested Minutes */
+            suggested_minutes: number;
+        };
+        /**
          * OpenTimerResponse
          * @description GET /api/time/open — the manual start/stop timer cursor.
          *
@@ -812,10 +965,86 @@ export interface components {
             /** Last Seen At */
             last_seen_at: string;
         };
+        /**
+         * ReminderResponse
+         * @description Mirrors ``fennoc.store.accessors.SetDownItem`` (table ``set_down_items``,
+         *     migration 020). ``GET /api/reminders`` is the ledger's future SET DOWN
+         *     group's read; this is the same shape a single reminder's create/done/
+         *     snooze endpoints echo back.
+         */
+        ReminderResponse: {
+            /** Id */
+            id: string;
+            /** Owner */
+            owner: string;
+            /** Text */
+            text: string;
+            /** Condition Type */
+            condition_type: string;
+            /** Condition Value */
+            condition_value: string;
+            /** Source Turn Id */
+            source_turn_id: string | null;
+            /** Created At */
+            created_at: string;
+            /** Fired At */
+            fired_at: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Closed How */
+            closed_how: string | null;
+            /** Snoozed To */
+            snoozed_to: string | null;
+        };
+        /**
+         * ResolveOvernightRequest
+         * @description Body of ``POST /api/time/resolve-overnight`` (INT-057 commit 3).
+         *
+         *     ``minutes`` is the "given" half of "close the block with the given (or
+         *     suggested) duration" -- omit it to use ``fennoc.thread.
+         *     suggested_minutes``'s own code-derived number instead.
+         */
+        ResolveOvernightRequest: {
+            /** Block Id */
+            block_id: string;
+            /** Action */
+            action: string;
+            /** Minutes */
+            minutes?: number | null;
+        };
+        /**
+         * ResolveOvernightResponse
+         * @description ``POST /api/time/resolve-overnight`` -- mirrors
+         *     ``fennoc.thread.resolve_overnight``'s return dict exactly; see that
+         *     function's docstring for what each action does and does not touch.
+         */
+        ResolveOvernightResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Action */
+            action: string;
+            /** Block Id */
+            block_id: string;
+            /** Time Block Id */
+            time_block_id?: string | null;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Task Completed */
+            task_completed?: string | null;
+        };
         /** SetBudgetRequest */
         SetBudgetRequest: {
             /** Limit */
             limit: number;
+        };
+        /**
+         * SnoozeReminderRequest
+         * @description Body of ``POST /api/reminder/{id}/snooze`` -- reuses the commit-2
+         *     when-grammar (``fennoc.reminders.parse_when``), not a second parser.
+         */
+        SnoozeReminderRequest: {
+            /** Until */
+            until: string;
         };
         /**
          * StatusResponse
@@ -867,6 +1096,40 @@ export interface components {
             metadata: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ThreadDayResponse
+         * @description One entry in ``GET /api/thread``'s ``days`` array (INT-057 commit 3).
+         *
+         *     ``turns`` carries full ``AgentMessageResponse``-shaped items for a
+         *     ``"live"`` day, or an expanded (``?expand=YYYY-MM-DD``) ``"collapsed"``
+         *     one -- otherwise empty. ``line`` is populated only for a ``"collapsed"``
+         *     day (``fennoc.thread.day_summary_line``'s deterministic composition);
+         *     ``None`` for ``"live"``, where the client renders turns directly instead
+         *     of a summary line.
+         */
+        ThreadDayResponse: {
+            /** Date */
+            date: string;
+            /** State */
+            state: string;
+            /** Turns */
+            turns: components["schemas"]["AgentMessageResponse"][];
+            /** Line */
+            line: string | null;
+            /** Turn Count */
+            turn_count: number;
+        };
+        /**
+         * ThreadResponse
+         * @description ``GET /api/thread`` -- the durable thread the app renders (INT-057),
+         *     replacing the client's today-only in-memory store as the render source
+         *     (see the intent's own "What this amends").
+         */
+        ThreadResponse: {
+            /** Days */
+            days: components["schemas"]["ThreadDayResponse"][];
+            open_timer: components["schemas"]["OpenTimerCardResponse"] | null;
         };
         /**
          * TimeActionResponse
@@ -1603,6 +1866,109 @@ export interface operations {
             };
         };
     };
+    list_reminders_endpoint_api_reminders_get: {
+        parameters: {
+            query?: {
+                owner?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reminder_done_endpoint_api_reminder__reminder_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reminder_snooze_endpoint_api_reminder__reminder_id__snooze_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnoozeReminderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_image_endpoint_api_image_post: {
         parameters: {
             query?: never;
@@ -1757,6 +2123,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentMessageResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thread_endpoint_api_thread_get: {
+        parameters: {
+            query?: {
+                expand?: string[];
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_overnight_endpoint_api_time_resolve_overnight_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveOvernightRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveOvernightResponse"];
                 };
             };
             /** @description Validation Error */

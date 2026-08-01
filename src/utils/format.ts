@@ -79,3 +79,76 @@ export function chicagoToday(): string {
     day: "2-digit",
   }).format(new Date());
 }
+
+/**
+ * YYYY-MM-DD in America/Chicago for an arbitrary ISO instant — same
+ * projection `chicagoToday()` uses for "now", parametrized. This is how a
+ * turn's `created_at` or a provenance source's `ts` gets matched against
+ * `GET /api/thread`'s day keys (INT-057), which are themselves computed
+ * server-side in operator-local (America/Chicago) terms.
+ */
+export function chicagoDateKey(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+}
+
+/**
+ * Parses a bare `YYYY-MM-DD` day key into a LOCAL midnight `Date`, same
+ * "treat bare dates as local calendar days" convention `parseDueDate`
+ * above already uses. Deliberately NOT run through a `timeZone` formatting
+ * option afterward: the three digits already ARE the calendar date (the
+ * server computed them in America/Chicago; this function's only job is to
+ * recover which weekday/day-of-month/month those three numbers name), and
+ * reprojecting through `Intl.DateTimeFormat`'s `timeZone: "America/
+ * Chicago"` on a `new Date("YYYY-MM-DD")` (parsed as UTC midnight) would
+ * shift it BACKWARD a calendar day for any timezone behind UTC — a real
+ * bug this function exists to avoid, not a hypothetical one.
+ */
+function parseDateKey(dateKey: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const parsed = new Date(year, month, day);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** `"WED 29"` — weekday abbreviation + day-of-month, mono/terminus style
+ *  (step 18a). Used for a collapsed day's tappable summary line and a
+ *  live-but-past day's header. Falls back to the raw key on a malformed
+ *  input rather than throwing — a rendering nicety is not worth crashing
+ *  the thread over. */
+export function formatDayLabel(dateKey: string): string {
+  const parsed = parseDateKey(dateKey);
+  if (!parsed) return dateKey;
+  const weekday = parsed.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+  return `${weekday} ${parsed.getDate()}`;
+}
+
+/** `"SAT 1 AUG"` — weekday + day-of-month + month abbreviation, for the
+ *  date rule marking today's boundary (step 18a's worked example). */
+export function formatDayLabelWithMonth(dateKey: string): string {
+  const parsed = parseDateKey(dateKey);
+  if (!parsed) return dateKey;
+  const weekday = parsed.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+  const month = parsed.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  return `${weekday} ${parsed.getDate()} ${month}`;
+}
+
+/** Whether `dateKey` is the calendar day immediately before `todayKey` —
+ *  both bare `YYYY-MM-DD`, same convention as the rest of this section.
+ *  Used to render "YESTERDAY" instead of a bare day label for exactly the
+ *  one live-but-past day it names. */
+export function isYesterday(dateKey: string, todayKey: string): boolean {
+  const target = parseDateKey(dateKey);
+  const today = parseDateKey(todayKey);
+  if (!target || !today) return false;
+  return Math.round((today.getTime() - target.getTime()) / DAY_MS) === 1;
+}
