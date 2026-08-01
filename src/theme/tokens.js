@@ -9,12 +9,21 @@
 // build-tool-only and must never end up in the React Native bundle.
 //
 // Values copied verbatim from design_handoff_fennoc/README.md `## Design
-// tokens`. Do not hand-edit a hex here without updating the source doc.
+// tokens`, with the Fennoc Photo Capture.dc.html Step 18 token delta
+// (2026-07-31) layered on top — eight hex values warmed a few degrees plus
+// the new `mark` token (see the Step 18 spec's `1 · Token delta` table). Do
+// not hand-edit a hex here without updating the source doc.
 const colors = {
-  bg: { base: "#100E0B", raised: "#191512", overlay: "#1F1A16", float: "#241E19" },
-  line: { hairline: "#2B2521", strong: "#3A322B" },
-  ink: { DEFAULT: "#F2EAE0", secondary: "#B7ADA3", muted: "#8C8279", disabled: "#5C544D" },
+  bg: { base: "#120E0A", raised: "#1C1611", overlay: "#241D16", float: "#241E19" },
+  line: { hairline: "#2E2620", strong: "#3F352C" },
+  ink: { DEFAULT: "#F2EAE0", secondary: "#BFB2A4", muted: "#94887A", disabled: "#5C544D" },
   signal: { DEFAULT: "#F0A93B", on: "#1A1206", wash: "#2A2114" },
+  // Warm-neutral, in-app-only rendering of the mark ("mark/ui" per the
+  // handoff — distinct from "mark/brand", the full-amber app icon/launch/
+  // onboarding/App Store version, which stays `signal`'s #F0A93B and lives
+  // only in un-themeable assets: app.json, android/, assets/). Step 18 §3,
+  // "Loud at the door, quiet in the room."
+  mark: "#C6A98A",
   positive: "#8FA167",
   clay: "#A8705A",
   alert: "#D4674A",
@@ -24,18 +33,28 @@ const colors = {
     ink: "#1A1613", inkSecondary: "#57504A", inkMuted: "#7A7168",
     signal: "#9A5B00", signalWash: "#F7E4C4",
     positive: "#4E5C2E", clay: "#8A5342", alert: "#A33A1C",
-    // The three fields below have no day-mode value in design_handoff's
-    // README. `float` and `signalOn` are still unused today (no `bg-bg-float`
-    // / `bg-signal-on` classNames exist anywhere) and only defined here so
-    // every CSS variable tailwind.config.js references has SOME day-mode
-    // value once vars() swaps the palette. `inkDisabled` IS surfaced now —
-    // colors.ts's `Palette.ink.disabled` reads it, for FennocMark's
-    // `presence.think` third column (INT-025's motion spec). If `float` or
-    // `signalOn` become load-bearing too, replace these with real design
-    // values the same way.
+    // The four fields below have no day-mode value in design_handoff's
+    // README (or, for `mark`, in the Step 18 spec, which only gives the
+    // night value). `float` and `signalOn` are still unused today (no
+    // `bg-bg-float` / `bg-signal-on` classNames exist anywhere) and only
+    // defined here so every CSS variable tailwind.config.js references has
+    // SOME day-mode value once vars() swaps the palette. `inkDisabled` IS
+    // surfaced now — colors.ts's `Palette.ink.disabled` reads it, for
+    // FennocMark's `presence.think` third column (INT-025's motion spec).
+    // If `float` or `signalOn` become load-bearing too, replace these with
+    // real design values the same way.
     float: "#FFFFFF", // day's overlay is already pure white; float can't go lighter
     inkDisabled: "#9A8F82", // fainter than inkMuted, same direction as night's ratio
     signalOn: "#FFFCF7", // day's signal is a dark amber (unlike night's bright one) — needs light "on" text, not dark
+    // NEEDS DESIGN PASS: no day-mode `mark` value shipped in Step 18 (the
+    // spec's token-delta table only gives the night hex, "in-app only").
+    // Derived rather than guessed flat: night's mark (#C6A98A) sits lighter
+    // and warmer than night's ink.muted (#94887A) by a fixed per-channel
+    // ratio (~1.34x R, ~1.24x G, ~1.13x B); applied that same ratio to day's
+    // inkMuted (#7A7168) to keep the mark's relative "warm but quiet"
+    // position consistent across themes. Flag for a real design value
+    // before this ships to day-mode users.
+    mark: "#A38D76",
   },
 };
 
@@ -80,6 +99,7 @@ const cssVarNames = {
   positive: "--color-positive",
   clay: "--color-clay",
   alert: "--color-alert",
+  mark: "--color-mark",
 };
 
 function buildVars(palette) {
@@ -100,6 +120,7 @@ function buildVars(palette) {
     [cssVarNames.positive]: hexToRgbTriple(palette.positive),
     [cssVarNames.clay]: hexToRgbTriple(palette.clay),
     [cssVarNames.alert]: hexToRgbTriple(palette.alert),
+    [cssVarNames.mark]: hexToRgbTriple(palette.mark),
   };
 }
 
@@ -113,6 +134,7 @@ const nightVars = buildVars({
   positive: colors.positive,
   clay: colors.clay,
   alert: colors.alert,
+  mark: colors.mark,
 });
 
 const dayVars = buildVars({
@@ -128,6 +150,7 @@ const dayVars = buildVars({
   positive: colors.day.positive,
   clay: colors.day.clay,
   alert: colors.day.alert,
+  mark: colors.day.mark,
 });
 
 module.exports = { colors, cssVarNames, nightVars, dayVars };

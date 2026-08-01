@@ -35,6 +35,8 @@ export interface Palette {
   positive: string;
   clay: string;
   alert: string;
+  /** Warm-neutral, in-app-only rendering of the mark ("mark/ui" — see tokens.js). */
+  mark: string;
 }
 
 export const nightPalette: Palette = {
@@ -60,6 +62,7 @@ export const nightPalette: Palette = {
   positive: rawTokens.positive,
   clay: rawTokens.clay,
   alert: rawTokens.alert,
+  mark: rawTokens.mark,
 };
 
 export const dayPalette: Palette = {
@@ -85,6 +88,7 @@ export const dayPalette: Palette = {
   positive: rawTokens.day.positive,
   clay: rawTokens.day.clay,
   alert: rawTokens.day.alert,
+  mark: rawTokens.day.mark,
 };
 
 // --- Legacy compatibility shim -------------------------------------------
