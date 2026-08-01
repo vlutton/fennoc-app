@@ -2,7 +2,7 @@
   "expo": {
     "name": "fennoc-app",
     "slug": "fennoc-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -45,6 +45,14 @@
         {
           "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read — nothing else in your library is touched.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Fennoc listens while you speak so it can turn your voice into text in the composer. The audio itself is never saved or sent anywhere; only the transcript is kept.",
+          "speechRecognitionPermission": "Fennoc uses on-device speech recognition to turn what you say into text. Recognition happens on your phone, not a server.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ]
     ],
