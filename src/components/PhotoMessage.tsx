@@ -72,12 +72,53 @@ function ShotLine({ shot }: { shot: PhotoBatch["shots"][number] }) {
     );
   }
 
-  // The extracted read itself — the whole point of an unrouted shot. No
-  // Pressable wraps any ShotLine; Undo lives on the header above.
+  // An unrouted shot's extraction collapses behind the same grey-header
+  // treatment the Receipt uses (INT-050's visual language, reused rather
+  // than reinvented). Step 11's reading rule — "one line, then the item.
+  // Never a bulleted extraction dump in the thread" — and the extraction
+  // rendered open was exactly that dump: 75% of the screen, at the same
+  // visual level as the actual answer. The machine text is subordinate
+  // material: available on a tap, never competing with the reply.
+  return <CollapsedExtraction text={shot.extractedText ?? ""} />;
+}
+
+/**
+ * Collapsed: `WHAT IT READ`, mono, ink-disabled — the Receipt's exact
+ * collapsed treatment (grey, deliberately, never amber: available to the
+ * user, not asking for their attention). Tap: header lifts to ink-muted
+ * and the full extraction opens beneath, selectable. Local state is
+ * enough for persistence — the thread is a ScrollView (children stay
+ * mounted), and the store's own thread state is in-memory session-local
+ * anyway.
+ */
+function CollapsedExtraction({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <Text className="font-sans text-body text-ink" selectable>
-      {shot.extractedText}
-    </Text>
+    <View>
+      <Pressable
+        accessibilityHint={expanded ? "Tap to collapse" : "Tap to show the full text it read"}
+        accessibilityLabel="What it read"
+        accessibilityRole="button"
+        hitSlop={4}
+        onPress={() => setExpanded((v) => !v)}
+      >
+        <Text
+          className={
+            expanded
+              ? "font-mono-medium text-dataSm text-ink-muted"
+              : "font-mono-medium text-dataSm text-ink-disabled"
+          }
+          numberOfLines={1}
+        >
+          WHAT IT READ
+        </Text>
+      </Pressable>
+      {expanded ? (
+        <Text className="mt-1 font-sans text-body text-ink" selectable>
+          {text}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
