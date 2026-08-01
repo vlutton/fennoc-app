@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 
 import { deleteImage, formatApiError } from "../api/client";
+import type { AgentAction } from "../api/types";
 
 /**
  * Session-local record of user captures, used only to render the user's
@@ -39,6 +40,14 @@ export interface ThreadCapture {
     state: "thinking" | "done" | "error";
     /** The collapsed remainder of a long reply; null when the reply fit in the lede. */
     body: string | null;
+    /**
+     * The turn's receipt rows (INT-050) — null until the turn resolves
+     * `done`, and null forever for a turn from a server build that doesn't
+     * send `actions` yet (see `AgentAction`'s own doc comment in
+     * api/types.ts). `qualifiesForReceipt` (components/Receipt.tsx) is the
+     * one place that decides whether this is enough to show anything.
+     */
+    actions: AgentAction[] | null;
   };
   /**
    * Present only on Fennoc entries produced by the photo-capture hot path
@@ -156,12 +165,30 @@ interface ThreadState {
    */
   resolveAgent: (
     messageId: string,
-    result: { text: string; body: string | null; state: "done" | "error" },
+    result: {
+      text: string;
+      body: string | null;
+      state: "done" | "error";
+      /** Omit for an error resolution — there is no turn to report a receipt for. */
+      actions?: AgentAction[] | null;
+    },
   ) => void;
   /** What the composer is currently answering, for the quoted strip above it.
    *  UI state only — see the note in CaptureBar on why the quote is not sent. */
   replyingTo: { messageId: string; quote: string } | null;
   setReplyingTo: (value: { messageId: string; quote: string } | null) => void;
+
+  /**
+   * Whether a turn's receipt (INT-050) is currently expanded, keyed by
+   * `agent.messageId`. In-memory only, same as the rest of this store — "a
+   * thread scrolled back to keeps whatever expansion state the user left it
+   * in" only needs to survive a scroll, not an app restart, and matches
+   * `useThread`'s existing session-local semantics exactly (see the file
+   * header). Missing key means collapsed, not "expand once and forget" —
+   * there is no need for a separate "seen" flag.
+   */
+  receiptExpanded: Record<string, boolean>;
+  toggleReceiptExpanded: (messageId: string) => void;
 
   /**
    * Start a new photo-batch thread entry with its first shot. Called once
@@ -206,7 +233,7 @@ export const useThreadStore = create<ThreadState>()((set, get) => ({
         ...state.captures,
         {
           ...entry("", "fennoc"),
-          agent: { messageId, state: "thinking", body: null },
+          agent: { messageId, state: "thinking", body: null, actions: null },
         },
       ],
     })),
@@ -217,13 +244,27 @@ export const useThreadStore = create<ThreadState>()((set, get) => ({
           ? {
               ...c,
               text: result.text,
-              agent: { ...c.agent, body: result.body, state: result.state },
+              agent: {
+                ...c.agent,
+                body: result.body,
+                state: result.state,
+                actions: result.actions ?? null,
+              },
             }
           : c,
       ),
     })),
   replyingTo: null,
   setReplyingTo: (value) => set({ replyingTo: value }),
+
+  receiptExpanded: {},
+  toggleReceiptExpanded: (messageId) =>
+    set((state) => ({
+      receiptExpanded: {
+        ...state.receiptExpanded,
+        [messageId]: !state.receiptExpanded[messageId],
+      },
+    })),
 
   addPhotoBatch: (batchId, firstShot) =>
     set((state) => {

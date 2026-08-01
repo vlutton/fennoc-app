@@ -37,8 +37,29 @@ export type Budget = components["schemas"]["BudgetResponse"];
 /** POST /api/message — 202 Accepted; the row has just been created (INT-029b). */
 export type AgentMessageCreated = components["schemas"]["AgentMessageCreatedResponse"];
 
+/**
+ * One row of a turn's receipt (INT-050) — "what this turn read, wrote, or
+ * declined," rendered in the order they happened. Hand-written, not
+ * generated: `fennoc-core`'s server team is landing `actions` on
+ * `GET /api/message/{id}` (and thread listing) in parallel with this
+ * client change, so it isn't in `schema.gen.ts` yet. `AgentMessage` below
+ * declares it optional-and-nullable for exactly that reason — until the
+ * server ships, every real response simply omits the key, which reads
+ * identically to `null` for every consumer in this app (see
+ * `qualifiesForReceipt` in components/Receipt.tsx). Re-derive this type
+ * from the generated schema (drop this intersection) once
+ * `npm run gen:api-schema && npm run gen:api-types` picks up the real field.
+ */
+export interface AgentAction {
+  text: string;
+  kind: "write" | "read" | "decline";
+}
+
 /** GET /api/message/{id} and /api/messages — full `agent_messages` row (INT-029b). */
-export type AgentMessage = components["schemas"]["AgentMessageResponse"];
+export type AgentMessage = components["schemas"]["AgentMessageResponse"] & {
+  /** See `AgentAction`'s own doc comment — not yet in the generated schema. */
+  actions?: AgentAction[] | null;
+};
 
 /** POST /api/push/register — echoes back the upserted `device_tokens` row. */
 export type PushRegisterResult = components["schemas"]["PushRegisterResponse"];
