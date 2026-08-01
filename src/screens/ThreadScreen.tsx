@@ -9,10 +9,10 @@ import { CaptureBar } from "../components/CaptureBar";
 import { CheckinCard } from "../components/CheckinCard";
 import { FennocMark } from "../components/FennocMark";
 import { LedgerSheet } from "../components/LedgerSheet";
-import { NextStrip } from "../components/NextStrip";
 import { PhotoMessage } from "../components/PhotoMessage";
 import { ReplySheet } from "../components/ReplySheet";
 import { StatusStrip } from "../components/StatusStrip";
+import { Strip } from "../components/Strip";
 import { useAgentMessagePoll } from "../hooks/useAgentMessage";
 import { useEveningBriefing, useMorningBriefing } from "../hooks/useBriefing";
 import { usePendingCheckin, useReplyCheckin } from "../hooks/useHome";
@@ -672,7 +672,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
           />
         ) : null}
 
-        <NextStrip />
+        <Strip />
         <CaptureBar />
       </KeyboardAvoidingView>
 
