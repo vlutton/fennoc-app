@@ -10,6 +10,21 @@
  * open app, not about hiding that Fennoc pinged at all. `shouldSetBadge` is
  * false because badges are not part of this app's UI (out of INT-020 scope).
  *
+ * THE SERVER'S RAW ENVELOPE IS SUPPRESSED ENTIRELY (Aug 2026 "blank
+ * notification" fix): the block above describes behaviour for a real,
+ * content-bearing notification. The server's own push, though, carries no
+ * content at all — just a `{channel, id, v}` pointer (see doorbell.ts's
+ * module docstring) — and this handler runs for EVERY notification the OS
+ * hands the app, including that pointer, before doorbell.ts's own listener
+ * has a chance to fetch real content and post a replacement. `shouldShowList:
+ * true` above still puts that title-less, body-less pointer into the
+ * system tray/history, which is exactly the reported bug: a blank
+ * notification while the app was foregrounded. `isServerEnvelope` (keyed
+ * on the presence of `v`, the same discriminator doorbell.ts's loop guard
+ * uses — see its docstring) is how this handler tells "the server's
+ * pointer, never worth showing as-is" apart from "doorbell's own local
+ * repost, real content, no `v`, show it exactly as before."
+ *
  * Response listener: reads `actionIdentifier` + `userText` off
  * `NotificationResponse` (per expo-notifications@57.0.7's
  * `Notifications.types.d.ts`) and, for the `questions` channel only, routes
@@ -30,6 +45,7 @@ import { formatApiError, replyCheckin } from "../api/client";
 import { enqueueIfOffline, isNetworkError } from "../outbox";
 import { ACTION_ANSWER, ACTION_NOT_NOW } from "./categories";
 import type { ChannelId } from "./channels";
+import { isServerEnvelope } from "./doorbell";
 
 const NOT_NOW_REPLY_TEXT = "Not now";
 
@@ -40,12 +56,26 @@ const NOT_NOW_REPLY_TEXT = "Not now";
  */
 export function configureNotificationHandler(): void {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: false,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      if (isServerEnvelope(notification.request.content.data)) {
+        // The server's raw pointer — a doorbell that hasn't been resolved
+        // into real content yet. Never worth showing as-is; see this
+        // file's own header comment. All-false, not just no-banner: this
+        // is the difference from the branch below.
+        return {
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      }
+      return {
+        shouldShowBanner: false,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 

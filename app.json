@@ -29,7 +29,8 @@
         "expo-notifications",
         {
           "icon": "./assets/ic-stat-fennoc.png",
-          "color": "#F0A93B"
+          "color": "#F0A93B",
+          "enableBackgroundRemoteNotifications": true
         }
       ],
       [
