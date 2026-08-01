@@ -53,6 +53,7 @@ module.exports = {
         positive: rgbVar(cssVarNames.positive),
         clay: rgbVar(cssVarNames.clay),
         alert: rgbVar(cssVarNames.alert),
+        mark: rgbVar(cssVarNames.mark),
 
         // TRANSITIONAL — remove in INT-023/024 once the screens are rewritten.
         //

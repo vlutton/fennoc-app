@@ -123,7 +123,7 @@ function FennocMessage({
 function UserBubble({ text }: { text: string }) {
   return (
     <View className="items-end">
-      <View className="max-w-[84%] rounded-tl-md rounded-tr-md rounded-bl-md rounded-br-[4px] bg-bg-float px-4 py-3">
+      <View className="max-w-[84%] rounded-tl-md rounded-tr-md rounded-bl-md rounded-br-[4px] border border-line-hairline bg-bg-raised px-4 py-3">
         <Text className="font-sans text-body text-ink">{text}</Text>
       </View>
     </View>
@@ -503,7 +503,7 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
           className="h-touch w-touch items-center justify-center"
           onLongPress={onOpenSettings}
         >
-          <FennocMark color={palette.ink.muted} size={24} />
+          <FennocMark color={palette.mark} size={24} />
         </Pressable>
 
         <Text
