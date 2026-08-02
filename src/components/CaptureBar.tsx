@@ -1,10 +1,13 @@
+import {
+  getRecordingPermissionsAsync,
+  requestRecordingPermissionsAsync,
+  RecordingPresets,
+  useAudioRecorder,
+} from "expo-audio";
 import * as Crypto from "expo-crypto";
+import { File } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from "expo-speech-recognition";
 import { ArrowUp, Mic, Square, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,6 +22,7 @@ import {
   View,
 } from "react-native";
 
+import { transcribeAudio } from "../api/client";
 import { captureShot } from "../capture/photoCapture";
 import { useSendAgentMessage } from "../hooks/useAgentMessage";
 import { useCapture } from "../hooks/useHome";
@@ -41,37 +45,53 @@ const COMPOSER_LINE_HEIGHT = 24;
 const COMPOSER_MIN_HEIGHT = COMPOSER_LINE_HEIGHT;
 const COMPOSER_MAX_HEIGHT = COMPOSER_LINE_HEIGHT * 4.5;
 
-// INT-040: quiet, non-modal copy for the speech-recognition "error" event.
-// No exclamation marks, no praise — matches this file's existing feedback
-// copy ("Captured.", "Held. Will send."). `aborted` deliberately has no
-// entry here: it's what `stop()`/`abort()` themselves can surface, i.e. the
-// user's own tap-to-stop, not a failure worth a message.
-const VOICE_ERROR_MESSAGES: Partial<Record<string, string>> = {
-  "no-speech": "No speech detected.",
-  "not-allowed": "Microphone access is off.",
-  "service-not-allowed": "Voice capture isn't available on this device.",
-  "audio-capture": "Microphone unavailable.",
-  "language-not-supported": "Voice recognition isn't available for this language on this device.",
-  network: "Voice capture needs a connection right now.",
-};
+// INT-040 ruling 1c: server Whisper, not on-device recognition. Recording
+// itself can't meaningfully fail the way recognition could (no "no-speech" /
+// "language-not-supported" cases — those were properties of the on-device
+// recognizer, not of a plain audio recording), so this collapses to a
+// handful of quiet, non-modal lines rather than an error-code table. No
+// exclamation marks, no praise — matches this file's existing feedback copy
+// ("Captured.", "Held. Will send.").
+const VOICE_TRANSCRIBE_FAILED = "Couldn't transcribe that — try again, or type it.";
+const VOICE_OFFLINE = "Voice capture needs a connection right now.";
+const VOICE_MIC_OFF = "Microphone access is off.";
+const VOICE_MIC_OFF_SETTINGS = "Microphone access is off — opening settings.";
+const VOICE_MIC_OFF_ENABLE = "Microphone access is off — enable it in system settings for Fennoc.";
 
-const voiceErrorMessage = (code: string) =>
-  VOICE_ERROR_MESSAGES[code] ?? "Voice capture didn't catch that.";
+// Safety-cap backstop (step 2 of the build note), NOT the primary stop
+// mechanism — the primary stop is always the user's own second tap. This
+// only exists so a pocket-tap that starts a recording and is never
+// consciously stopped doesn't record indefinitely.
+const RECORDING_CAP_MS = 120_000;
+
+// `RecordingPresets.HIGH_QUALITY` (expo-audio, SDK 57) produces a `.m4a`
+// (AAC-in-MPEG-4) file on both platforms — see the preset's own `extension`
+// field. `audio/m4a` is what this is uploaded as; the server decodes via
+// faster-whisper's bundled `av`, which reads the container regardless of
+// the exact MIME string, but this is still the value fennoc-core's mime
+// check (415 for a bad one) will see.
+const RECORDING_MIME = "audio/m4a";
 
 /**
  * `bg.float`, 1px top border `line.strong`, padding 14/16, gap 14. The
  * 72×72 mic is the largest target on screen and the default input.
  *
  * With something typed (or a photo staged), tapping the mic sends — see
- * `onMicPress` below. With the composer empty, it starts on-device speech
- * recognition (INT-040): tap to start, tap again to stop, never
- * press-and-hold (PRD). Interim results stream straight into the composer
- * as they arrive; the final transcript sits there for a glance/edit before
- * the user sends it themselves — this build never auto-sends a transcript
- * (INT-040 ruling 2). The signature listening/thinking/done animation is
- * still INT-025 scope and deliberately NOT built here — the mic icon
- * swapping to a stop glyph while recognizing is the only state change,
- * on purpose (a real capability, not a rehearsal of one).
+ * `onMicPress` below. With the composer empty, it RECORDS (INT-040 ruling
+ * 1c — server Whisper, cut over from the on-device recognizer this used to
+ * drive): tap to start, tap again to stop, never press-and-hold (PRD), and
+ * — the point of the cutover — no silence-VAD auto-stopping either; the
+ * on-device path's endpointing is exactly what was clipping the operator
+ * mid-thought. Stopping uploads the recording to `POST /api/transcribe`
+ * (`transcribeAudio`, src/api/client.ts) and drops the returned text into
+ * the composer for a glance/edit before the user sends it themselves — this
+ * build never auto-sends a transcript (INT-040 ruling 2). The recording
+ * itself never survives the round trip either way (ruling 3): deleted after
+ * a successful transcribe and after a failed one. The signature listening/
+ * thinking/done animation is still INT-025 scope and deliberately NOT built
+ * here — the mic icon swapping to a stop glyph while recording, and a quiet
+ * "Transcribing…" line while the upload is in flight, are the only state
+ * changes, on purpose (a real capability, not a rehearsal of one).
  *
  * Product decision (INT-029b): the composer talks to the *agent*
  * (`POST /api/message`), not `/api/capture`, because the thread is a
@@ -167,13 +187,27 @@ export function CaptureBar() {
   // state at all). Cleared by sending, by the X on the attachment strip,
   // or by picking again.
   const [pendingImage, setPendingImage] = useState<{ uri: string; mime: string } | null>(null);
-  // INT-040: true while on-device speech recognition is actively listening.
-  // Set synchronously at the moment `start()` is called (not on the native
-  // "start" event) — same "reflect the tap immediately, don't wait on a
-  // round trip" pattern as `capturing` in CameraCapture.tsx. Cleared on the
-  // native "end" event, which the library guarantees fires last, even after
-  // an error (see `voiceErrorMessage` above).
-  const [recognizing, setRecognizing] = useState(false);
+  // INT-040 ruling 1c: true while the recorder is actively capturing. Set
+  // synchronously at the moment `record()` is called (not on any native
+  // status callback) — same "reflect the tap immediately, don't wait on a
+  // round trip" pattern as `capturing` in CameraCapture.tsx. `transcribing`
+  // is the second, disjoint phase: true from the moment `stop()` resolves
+  // until `transcribeAudio` settles either way — the two never overlap, but
+  // are kept as separate booleans rather than one enum because the mic
+  // button's disabled/glyph logic below already reads more clearly as two
+  // independent checks than as a switch.
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  // expo-audio's own recording instance — created once, auto-released on
+  // unmount by the hook itself. `HIGH_QUALITY` is the SDK's server-friendly
+  // preset (m4a/AAC); see `RECORDING_MIME` above for why that's what gets
+  // uploaded.
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // The safety-cap backstop's timer handle (`RECORDING_CAP_MS` above) — a
+  // second timer ref alongside `clearTimer`, since the two run on
+  // completely different clocks (feedback-line auto-clear vs. "stop
+  // recording no matter what").
+  const recordingCapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Selected as an action reference, not derived state — see the store's own
   // "Maximum update depth exceeded" warning on why a selector here must
   // never allocate.
@@ -185,12 +219,30 @@ export function CaptureBar() {
   useEffect(() => {
     return () => {
       if (clearTimer.current) clearTimeout(clearTimer.current);
-      // INT-040: if this bar unmounts mid-recognition (navigating away
-      // while listening), abort rather than leaving the native session — and
-      // the OS mic indicator — running with nothing left to receive its
-      // events. A no-op if nothing is in progress.
-      ExpoSpeechRecognitionModule.abort();
+      if (recordingCapTimer.current) clearTimeout(recordingCapTimer.current);
+      // INT-040: if this bar unmounts mid-recording (navigating away while
+      // recording), stop the native recorder rather than leaving it — and
+      // the OS mic indicator — running with nothing left to receive the
+      // result. Best-effort and fire-and-forget: there is no state left to
+      // update once unmounted, and nothing here to transcribe into (ruling
+      // 2's "review before send" doesn't apply to a composer that's gone).
+      // `audioRecorder` itself is released automatically by the hook.
+      if (audioRecorder.isRecording) {
+        audioRecorder
+          .stop()
+          .then(() => {
+            const uri = audioRecorder.uri;
+            if (!uri) return;
+            try {
+              new File(uri).delete();
+            } catch {
+              // best-effort cleanup only
+            }
+          })
+          .catch(() => {});
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Collapse the composer back to one line whenever it empties. This is
@@ -249,33 +301,6 @@ export function CaptureBar() {
       setErrorMsg(null);
     }, 1500);
   };
-
-  // INT-040: interim AND final results land here — the library doesn't
-  // distinguish them in a way this component needs to, since either way the
-  // right move is "show what's been heard so far." `results[0]` is the
-  // top alternative; `maxAlternatives` is left at its default (1), so
-  // there's only ever one to read. Only fires while `startListening` below
-  // is running, and only ever with the composer already empty (see
-  // `onMicPress`), so this can never clobber typed text.
-  useSpeechRecognitionEvent("result", (event) => {
-    const transcript = event.results[0]?.transcript;
-    if (transcript !== undefined) setText(transcript);
-  });
-
-  // Guaranteed to fire last by the library, even after an "error" — the one
-  // place `recognizing` is ever cleared.
-  useSpeechRecognitionEvent("end", () => {
-    setRecognizing(false);
-  });
-
-  // The quiet, non-modal line this file already has for a failed send
-  // (`feedback === "error"` below) is reused here rather than adding a
-  // second error surface — see INT-040's "never a modal, never a toast"
-  // requirement. `aborted` never reaches here because tap-to-stop below
-  // calls `stop()` (a graceful stop with whatever was heard), not `abort()`.
-  useSpeechRecognitionEvent("error", (event) => {
-    showFeedback("error", voiceErrorMessage(event.error));
-  });
 
   // Fallback path: the existing /api/capture mutation, used only when the
   // agent send fails offline. It already queues to the outbox and echoes
@@ -430,33 +455,92 @@ export function CaptureBar() {
   const pending = sendAgentMessage.isPending || captureMutation.isPending;
   const hasText = text.trim().length > 0;
 
-  // INT-040: tap to stop, called from `onMicPress` below and from the
-  // unmount cleanup effect above. Deliberately `stop()`, not `abort()` — a
-  // graceful stop hands back whatever was heard as the final "result" event
-  // before "end" fires, which is what leaves a transcript in the composer
-  // to edit/send rather than discarding it.
-  const stopListening = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    ExpoSpeechRecognitionModule.stop();
+  // Best-effort delete of a recording that's done its one job (uploaded, or
+  // failed to). INT-040 ruling 3: audio is discarded after one pass — never
+  // written to durable storage, unlike the held-photo path's deliberate
+  // `persistForHold` (photoCapture.ts). A failed delete here must never
+  // surface as a user-facing error; the transcript outcome already has its
+  // own feedback line, and a stray temp file the OS will eventually reclaim
+  // from cache is not worth a second one.
+  const deleteRecording = (uri: string) => {
+    try {
+      new File(uri).delete();
+    } catch (deleteError) {
+      console.warn("[voice] couldn't delete recording", deleteError);
+    }
   };
 
-  // INT-040: tap to start. Gated on three checks — device capability,
-  // microphone/speech permission, and on-device model availability — run
-  // BEFORE the haptic and `start()` call, not after, so a tap that can't
-  // possibly start recognition doesn't buzz the user for nothing (mirrors
-  // `onShutterPress`'s `cameraReady` gate in CameraCapture.tsx). Any
-  // failure here degrades silently to the same quiet composer-adjacent
-  // line a failed send already uses — never a modal, never a toast.
-  const startListening = async () => {
-    if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
-      showFeedback("error", "Voice capture isn't available on this device.");
+  // INT-040 ruling 1c: tap to stop, called from `onMicPress` below and (a
+  // fire-and-forget variant of the same idea) from the unmount cleanup
+  // effect above. Stops the recorder, uploads whatever was captured to
+  // `POST /api/transcribe`, and drops the result into the composer — never
+  // auto-sent (ruling 2). No silence-VAD anywhere in this path; the user's
+  // own second tap is the only thing that ends a recording, which is the
+  // whole point of the cutover (see the top-of-file comment).
+  const stopRecording = async () => {
+    if (recordingCapTimer.current) {
+      clearTimeout(recordingCapTimer.current);
+      recordingCapTimer.current = null;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setRecording(false);
+
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    setFeedback(null);
+    setErrorMsg(null);
+
+    try {
+      await audioRecorder.stop();
+    } catch (stopError) {
+      console.warn("[voice] recorder stop failed", stopError);
+    }
+
+    const uri = audioRecorder.uri;
+    if (!uri) {
+      // Nothing was captured to upload — same quiet line a transcription
+      // failure gets below, since from the user's seat the outcome is
+      // identical: they tapped stop and got no text back.
+      showFeedback("error", VOICE_TRANSCRIBE_FAILED);
       return;
     }
 
-    const existing = await ExpoSpeechRecognitionModule.getPermissionsAsync();
+    setTranscribing(true);
+    try {
+      const result = await transcribeAudio(uri, RECORDING_MIME);
+      // Empty transcript ("" — Whisper heard nothing usable) is quiet and
+      // fine: leave the composer exactly as it was, no error. Only a
+      // non-empty transcript ever touches `text`, and only ever from an
+      // empty composer (onMicPress only starts a recording when the
+      // composer is already empty), so this can never clobber typed text.
+      if (result.text) setText(result.text);
+    } catch (error) {
+      // Offline: the recorder itself works with no network (it's local),
+      // but the server can't transcribe with none — `isNetworkError` is the
+      // same check the text-send path already uses (onSubmit above) for the
+      // identical situation. This build does not queue the audio for a
+      // later drain (INT-040 notes that as a mitigation, not this commit's
+      // scope) — the composer stays empty and typeable either way, which is
+      // the one thing that must not be lost.
+      showFeedback("error", isNetworkError(error) ? VOICE_OFFLINE : VOICE_TRANSCRIBE_FAILED);
+    } finally {
+      setTranscribing(false);
+      deleteRecording(uri);
+    }
+  };
+
+  // INT-040 ruling 1c: tap to start. Permission handling is a straight
+  // carry-over of the on-device path's own logic (`canAskAgain` /
+  // `openSettings` fallback) — that UX was already right, and RECORD_AUDIO
+  // (shipped in 1.2.2 for the old recognizer) is exactly what the recorder
+  // needs too, so nothing about this gate changes, only which module it
+  // asks. No device-capability / model-availability checks remain here —
+  // those were properties of the on-device recognizer; a plain recording
+  // has nothing equivalent to check before starting.
+  const startRecording = async () => {
+    const existing = await getRecordingPermissionsAsync();
     if (!existing.granted) {
       // Android treats a dismissed dialog as a denial and stops re-asking
-      // after very few of those — at which point requestPermissionsAsync
+      // after very few of those — at which point requestRecordingPermissionsAsync
       // resolves denied instantly and "Microphone access is off" was a
       // dead end the user could not act on from here. The tap's intent is
       // unambiguous (they pressed the mic wanting voice), so when the OS
@@ -465,36 +549,15 @@ export function CaptureBar() {
       // reasoning as "ambiguity becomes a question" — a dead end becomes
       // a door.
       if (!existing.canAskAgain) {
-        showFeedback("error", "Microphone access is off — opening settings.");
+        showFeedback("error", VOICE_MIC_OFF_SETTINGS);
         await Linking.openSettings();
         return;
       }
-      const requested = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      const requested = await requestRecordingPermissionsAsync();
       if (!requested.granted) {
-        showFeedback(
-          "error",
-          requested.canAskAgain
-            ? "Microphone access is off."
-            : "Microphone access is off — enable it in system settings for Fennoc.",
-        );
+        showFeedback("error", requested.canAskAgain ? VOICE_MIC_OFF : VOICE_MIC_OFF_ENABLE);
         return;
       }
-    }
-
-    // Ruling 1b: on-device platform STT, not the cloud-backed mode these
-    // APIs default to. Forcing it is also what makes the offline promise
-    // (the persisted outbox this app already has) hold for voice: without
-    // it, a tap with no network would fail with a "network" error instead
-    // of transcribing locally. On Android this can be unavailable if the
-    // offline language pack was never downloaded — that's reported here
-    // rather than this app driving the OS's download flow, which is out of
-    // scope for this build (see the report on what INT-040 deferred).
-    if (!ExpoSpeechRecognitionModule.supportsOnDeviceRecognition()) {
-      showFeedback(
-        "error",
-        "Voice recognition isn't available on this device.",
-      );
-      return;
     }
 
     // A lingering ERROR from a previous attempt clears on the next one —
@@ -504,23 +567,23 @@ export function CaptureBar() {
     setErrorMsg(null);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setRecognizing(true);
-    ExpoSpeechRecognitionModule.start({
-      lang: "en-US",
-      interimResults: true,
-      requiresOnDeviceRecognition: true,
-      // `continuous` left at its default (false) on purpose — that default
-      // IS the endpointing this needs: the platform stops itself after a
-      // pause in speech rather than this app reimplementing silence
-      // detection. Tap-to-stop (`stopListening`) still works at any point
-      // regardless, per the PRD's "tap to start, tap to stop" rule.
-      //
-      // `recordingOptions` is left unset, which defaults `persist` to
-      // false — no audio file is ever written to disk for this to clean
-      // up. That's ruling 3 (audio never durably stored) satisfied by the
-      // library's own default, not by this app deleting anything after
-      // the fact.
-    });
+    try {
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+    } catch (startError) {
+      console.warn("[voice] recorder start failed", startError);
+      showFeedback("error", VOICE_TRANSCRIBE_FAILED);
+      return;
+    }
+    setRecording(true);
+
+    // Safety-cap backstop (see RECORDING_CAP_MS's own comment) — routes
+    // through the exact same `stopRecording` a real tap-to-stop would, so a
+    // pocket-tap that never gets consciously stopped still uploads and
+    // clears rather than sitting open forever.
+    recordingCapTimer.current = setTimeout(() => {
+      void stopRecording();
+    }, RECORDING_CAP_MS);
   };
 
   const onMicPress = () => {
@@ -528,11 +591,14 @@ export function CaptureBar() {
       onSubmit();
       return;
     }
-    if (recognizing) {
-      stopListening();
+    if (recording) {
+      void stopRecording();
       return;
     }
-    void startListening();
+    // Mid-transcription: the button is disabled below (`disabled={pending ||
+    // transcribing}`), so this is a belt-and-braces no-op, not a real path.
+    if (transcribing) return;
+    void startRecording();
   };
 
   return (
@@ -660,17 +726,23 @@ export function CaptureBar() {
 
         <Pressable
           accessibilityLabel={
-            recognizing ? "Stop" : hasText || pendingImage ? "Send" : "Capture"
+            recording
+              ? "Stop"
+              : transcribing
+                ? "Transcribing"
+                : hasText || pendingImage
+                  ? "Send"
+                  : "Capture"
           }
           accessibilityRole="button"
           className="h-mic w-mic items-center justify-center rounded-full bg-ink active:opacity-80"
-          disabled={pending}
+          disabled={pending || transcribing}
           onPress={onMicPress}
         >
-          {pending ? (
+          {pending || transcribing ? (
             <ActivityIndicator color={palette.bg.base} />
-          ) : recognizing ? (
-            // INT-040's one deliberate, minimal, non-animated "listening"
+          ) : recording ? (
+            // INT-040's one deliberate, minimal, non-animated "recording"
             // indicator — a filled square, the standard record/stop glyph.
             // No pulsing, no waveform: that's INT-025's signature animation,
             // built on top of this, not here. Smaller than the mic/arrow
@@ -702,6 +774,19 @@ export function CaptureBar() {
         visible={cameraOpen}
       />
 
+      {/* INT-040 ruling 1c, step 3: "a brief transcribing… state, reuse the
+          existing quiet feedback line, not a modal." Read directly off
+          `transcribing`, not `feedback` — this isn't one of the three
+          settled outcomes (captured/queued/error) `showFeedback` tracks,
+          it's an in-flight state between the recording ending and one of
+          those being decided. `stopRecording` above always clears
+          `feedback` before setting `transcribing`, so this and an error
+          line below never render at once in practice. */}
+      {transcribing ? (
+        <Text className="font-sans text-caption text-ink-muted">
+          Transcribing…
+        </Text>
+      ) : null}
       {feedback === "captured" ? (
         <Text className="font-sans text-caption text-ink-muted">
           Captured.

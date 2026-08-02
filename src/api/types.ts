@@ -173,3 +173,15 @@ export interface CaptureOpts {
   idempotency_key?: string;
   source_ref?: string;
 }
+
+/**
+ * `POST /api/transcribe` (INT-040 ruling 1c — server Whisper, cut over from
+ * on-device recognition). Hand-written, not generated: the endpoint is being
+ * built in `fennoc-core` in parallel with this client, so there is no
+ * `schema.gen.ts` entry for it yet. `text` is `""` (never absent) when
+ * Whisper heard nothing usable — CaptureBar treats that as quiet-and-fine,
+ * not an error.
+ */
+export interface TranscribeResult {
+  text: string;
+}
