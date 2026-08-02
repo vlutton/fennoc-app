@@ -28,6 +28,7 @@ import type {
   Thread,
   TimeBlock,
   TimeStartOpts,
+  TranscribeResult,
 } from "./types";
 import { getKey, useAuth } from "../store/useAuth";
 
@@ -376,4 +377,47 @@ export async function uploadImage(
  */
 export async function deleteImage(id: string): Promise<void> {
   await request<void>("DELETE", `/api/image/${id}`);
+}
+
+/**
+ * POST /api/transcribe — server-side Whisper (INT-040 ruling 1c). Mirrors
+ * `uploadImage` above exactly: same auth header (inherited from
+ * `getClient()`), same `{ uri, name, type }`-as-file `FormData` shape and
+ * the same `unknown`-then-`Blob` assertion for the same reason (RN's
+ * `FormData` accepts this at runtime; the DOM-flavoured `tsconfig` type only
+ * accepts a real `Blob`). `file` is the field name the server contract
+ * specifies — not `question`-adjacent, this endpoint takes no other fields.
+ *
+ * 30s timeout, not the 10s JSON default: transcription is a real Whisper
+ * inference call, not a database round trip, and can run a few seconds past
+ * a short recording (mirrors `uploadImage`'s own reasoning for its vision
+ * call). A timeout here still reads as a network error to `isNetworkError()`
+ * (src/outbox), which is what lets CaptureBar's offline handling fall out of
+ * the same check it already uses for the send path, rather than a second
+ * one.
+ *
+ * The server contract: 503 if Whisper isn't configured, 415 for a bad mime.
+ * Both surface as ordinary `formatApiError()`-shaped rejections — this
+ * function does not special-case either status; CaptureBar's caller decides
+ * what a failed transcription looks like in the UI (a quiet line, never a
+ * modal).
+ */
+export async function transcribeAudio(uri: string, mime: string): Promise<TranscribeResult> {
+  const instance = await getClient();
+
+  // The recorder's own `uri` already ends in the right extension for
+  // whatever preset produced it (`.m4a` for `RecordingPresets.HIGH_QUALITY`)
+  // — reusing that basename as the filename, rather than inventing one,
+  // means the multipart part's name matches what's actually inside it if
+  // the server (or a future debug log) ever looks at the extension.
+  const filename = uri.split("/").pop() || "recording.m4a";
+
+  const formData = new FormData();
+  formData.append("file", { uri, name: filename, type: mime } as unknown as Blob);
+
+  const response = await instance.post<TranscribeResult>("/api/transcribe", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30_000,
+  });
+  return response.data;
 }

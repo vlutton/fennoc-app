@@ -2,7 +2,7 @@
   "expo": {
     "name": "fennoc-app",
     "slug": "fennoc-app",
-    "version": "1.2.2",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -36,25 +36,21 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Fennoc reads what you point the camera at \u2014 a bill, a valve, a screen \u2014 the instant you press the shutter. The photo itself is never saved; only what it says is kept.",
-          "microphonePermission": false,
+          "cameraPermission": "Fennoc reads what you point the camera at — a bill, a valve, a screen — the instant you press the shutter. The photo itself is never saved; only what it says is kept.",
           "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read \u2014 nothing else in your library is touched."
+          "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read — nothing else in your library is touched."
         }
       ],
       [
-        "expo-speech-recognition",
+        "expo-audio",
         {
-          "microphonePermission": "Fennoc listens while you speak so it can turn your voice into text in the composer. The audio itself is never saved or sent anywhere; only the transcript is kept.",
-          "speechRecognitionPermission": "Fennoc uses on-device speech recognition to turn what you say into text. Recognition happens on your phone, not a server.",
-          "androidSpeechServicePackages": [
-            "com.google.android.googlequicksearchbox"
-          ]
+          "microphonePermission": "Fennoc records while you speak so it can send your voice to be transcribed into text in the composer. The recording itself is discarded right after — only the transcript is kept.",
+          "recordAudioAndroid": true
         }
       ]
     ],
