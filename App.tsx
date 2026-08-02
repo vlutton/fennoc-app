@@ -13,6 +13,7 @@ import {
   SafeAreaView,
 } from "react-native-safe-area-context";
 
+import { ReadingColumn } from "./src/components/ReadingColumn";
 import { useOutboxBootstrap } from "./src/hooks/useOutboxBootstrap";
 import { initNotifications } from "./src/notifications";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
@@ -45,7 +46,11 @@ function Root() {
 
   return (
     <View className="flex-1 bg-bg-base">
-      <ThreadScreen onOpenSettings={() => setSettingsOpen(true)} />
+      {/* The column is INSIDE the `bg-bg-base` view, so an iPad's margins are
+          the app's own background rather than bare white/black gutters. */}
+      <ReadingColumn>
+        <ThreadScreen onOpenSettings={() => setSettingsOpen(true)} />
+      </ReadingColumn>
 
       <Modal
         animationType="slide"
@@ -73,22 +78,28 @@ function Root() {
             plain `View` now, and the inset is claimed here, once, by the
             element actually at the top. */}
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <SafeAreaView className="bg-bg-base" edges={["top"]}>
-            <View className="h-16 flex-row items-center justify-between border-b border-line-hairline px-4">
-              <Text className="font-sans-semibold text-heading text-ink">
-                Settings
-              </Text>
-              <Pressable
-                accessibilityLabel="Close settings"
-                accessibilityRole="button"
-                className="h-touch w-touch items-center justify-center"
-                onPress={() => setSettingsOpen(false)}
-              >
-                <X color={palette.ink.DEFAULT} size={24} />
-              </Pressable>
-            </View>
-          </SafeAreaView>
-          <SettingsScreen />
+          {/* Its own `ReadingColumn`: this Modal has its own native root, so
+              the one wrapping `ThreadScreen` above does not reach in here. */}
+          <View className="flex-1 bg-bg-base">
+            <ReadingColumn>
+              <SafeAreaView className="bg-bg-base" edges={["top"]}>
+                <View className="h-16 flex-row items-center justify-between border-b border-line-hairline px-4">
+                  <Text className="font-sans-semibold text-heading text-ink">
+                    Settings
+                  </Text>
+                  <Pressable
+                    accessibilityLabel="Close settings"
+                    accessibilityRole="button"
+                    className="h-touch w-touch items-center justify-center"
+                    onPress={() => setSettingsOpen(false)}
+                  >
+                    <X color={palette.ink.DEFAULT} size={24} />
+                  </Pressable>
+                </View>
+              </SafeAreaView>
+              <SettingsScreen />
+            </ReadingColumn>
+          </View>
         </SafeAreaProvider>
       </Modal>
     </View>

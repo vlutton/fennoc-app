@@ -13,6 +13,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { READING_COLUMN_MAX_WIDTH } from "../theme/layout";
 import { useTheme } from "../theme/useTheme";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
@@ -112,14 +113,17 @@ function ReplySheetContent({
       />
 
       <View
-        className="rounded-t-sheet border-t border-line-strong bg-bg-overlay"
+        className="w-full self-center rounded-t-sheet border-t border-line-strong bg-bg-overlay"
         // No top inset: the sheet is bottom-anchored at 80% of the window, so
         // its top edge never reaches the status bar and `insets.top` would
         // only add ~50px of dead space above the drag handle. The nested
         // SafeAreaProvider above still matters — `insets.bottom` below is the
         // one that would resolve to 0 through a Modal and let the last line
         // of text sit under the gesture bar.
-        style={{ height: sheetHeight, paddingTop: 12 }}
+        // `maxWidth` centers the panel on a tablet (INT-060's reading
+        // column); the scrim above stays full-bleed so the thread behind it
+        // does not stay tappable down both margins.
+        style={{ height: sheetHeight, paddingTop: 12, maxWidth: READING_COLUMN_MAX_WIDTH }}
       >
         <View className="mt-3 h-1 w-9 self-center rounded-[2px] bg-line-strong" />
 
