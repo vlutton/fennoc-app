@@ -2,7 +2,7 @@
   "expo": {
     "name": "fennoc-app",
     "slug": "fennoc-app",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -44,8 +44,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read \u2014 nothing else in your library is touched.",
-          "microphonePermission": false
+          "photosPermission": "Fennoc reads a photo you choose from your library so you can send an existing picture instead of a new one. Only the photo you pick is read \u2014 nothing else in your library is touched."
         }
       ],
       [
