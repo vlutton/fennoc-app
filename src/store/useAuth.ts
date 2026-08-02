@@ -3,9 +3,9 @@ import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { DEFAULT_BASE_URL, migrateBaseUrl } from "./baseUrl";
+
 const API_KEY_STORAGE_KEY = "fennoc-api-key";
-const DEFAULT_BASE_URL =
-  "https://vinces-macbook-air.tail46861b.ts.net:8643";
 const DEFAULT_USER_ID = "vince";
 
 export type ThemePreference = "night" | "day" | "system";
@@ -56,11 +56,21 @@ export const useAuth = create<AuthState>()(
     {
       name: "fennoc-auth",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
-      // Runs once for any install that persisted state before this version
-      // (i.e. anything with the old "light" | "dark" | "system" theme
-      // values, or no version at all). Always returns a fully-populated,
-      // normalized shape so a missing/garbled field can't crash rehydration.
+      // v2 (2026-08-02): the server moved off the operator's laptop onto
+      // `api.fennoc.com` (INT-058 inc. 0). `baseUrl` is in `partialize`
+      // below, so it is persisted — which means changing `DEFAULT_BASE_URL`
+      // alone does NOTHING to an install that has already rehydrated once.
+      // Only a version bump runs `migrate`, and only `migrate` can move an
+      // existing phone off the dead Tailscale host. That is the whole reason
+      // this number changed.
+      version: 2,
+      // Runs for any install persisted at a lower version: v0/v1 theme values
+      // ("light" | "dark"), and v1's Tailscale base URL. Written to be
+      // version-agnostic rather than a switch on the incoming version —
+      // every field is normalized unconditionally and every normalizer is
+      // idempotent, so this is correct from any prior version and safe if it
+      // somehow runs twice. Always returns a fully-populated shape so a
+      // missing/garbled field can't crash rehydration.
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as Partial<{
           baseUrl: string;
@@ -68,7 +78,7 @@ export const useAuth = create<AuthState>()(
           theme: unknown;
         }>;
         return {
-          baseUrl: state.baseUrl ?? DEFAULT_BASE_URL,
+          baseUrl: migrateBaseUrl(state.baseUrl),
           userId: state.userId ?? DEFAULT_USER_ID,
           theme: normalizeThemePreference(state.theme),
         };

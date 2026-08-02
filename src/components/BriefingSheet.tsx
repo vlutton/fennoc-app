@@ -2,6 +2,7 @@ import { X } from "lucide-react-native";
 import { Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { READING_COLUMN_MAX_WIDTH } from "../theme/layout";
 import { useTheme } from "../theme/useTheme";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
@@ -83,8 +84,10 @@ function BriefingSheetContent({
       />
 
       <View
-        className="rounded-t-sheet border-t border-line-strong bg-bg-overlay"
-        style={{ height: sheetHeight, paddingTop: 12 }}
+        className="w-full self-center rounded-t-sheet border-t border-line-strong bg-bg-overlay"
+        // `maxWidth` centers the panel on a tablet (INT-060's reading
+        // column); the scrim stays full-bleed.
+        style={{ height: sheetHeight, paddingTop: 12, maxWidth: READING_COLUMN_MAX_WIDTH }}
       >
         <View className="mt-3 h-1 w-9 self-center rounded-[2px] bg-line-strong" />
 

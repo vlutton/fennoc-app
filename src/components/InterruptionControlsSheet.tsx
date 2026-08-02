@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 
 import type { Budget } from "../api/types";
+import { READING_COLUMN_MAX_WIDTH } from "../theme/layout";
 import { useTheme } from "../theme/useTheme";
 
 interface InterruptionControlsSheetProps {
@@ -58,8 +59,11 @@ export function InterruptionControlsSheet({
         {/* Swallow taps on the panel itself so they don't fall through to
             the scrim's dismiss handler above. */}
         <Pressable
-          className="gap-4 rounded-t-sheet border-t border-line-strong bg-bg-overlay p-4"
+          className="w-full gap-4 self-center rounded-t-sheet border-t border-line-strong bg-bg-overlay p-4"
           onPress={() => {}}
+          // `maxWidth` centers the panel on a tablet (INT-060's reading
+          // column); the scrim stays full-bleed.
+          style={{ maxWidth: READING_COLUMN_MAX_WIDTH }}
         >
           <View className="flex-row items-center justify-between">
             <Text className="font-sans-semibold text-heading text-ink">

@@ -26,6 +26,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { READING_COLUMN_MAX_WIDTH } from "../theme/layout";
 import { useTheme } from "../theme/useTheme";
 import { LedgerBriefingsSection } from "./LedgerBriefingsSection";
 import { LedgerRemindersSection } from "./LedgerRemindersSection";
@@ -238,8 +239,10 @@ function LedgerSheetContent({
           cap at this value.
         */}
         <View
-          className="rounded-t-sheet border-t border-line-strong bg-bg-overlay"
-          style={{ height: sheetHeight }}
+          className="w-full self-center rounded-t-sheet border-t border-line-strong bg-bg-overlay"
+          // `maxWidth` centers the panel on a tablet (INT-060's reading
+          // column); the scrim stays full-bleed.
+          style={{ height: sheetHeight, maxWidth: READING_COLUMN_MAX_WIDTH }}
         >
           <View className="mt-3 h-1 w-9 self-center rounded-[2px] bg-line-strong" />
 

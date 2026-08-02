@@ -39,9 +39,15 @@ function normalizeBaseUrl(url: string): string {
 }
 
 export async function getClient(): Promise<AxiosInstance> {
-  const { baseUrl, userId } = useAuth.getState();
+  const { baseUrl } = useAuth.getState();
   const apiKey = (await getKey()) ?? "";
 
+  // No identity header. `X-Fennoc-User` used to ride on every request and the
+  // server never read it: `verify_auth` takes only the bearer credential, and
+  // since INT-058 inc. 1–2 identity is whatever that token resolves to in the
+  // tokens table. A client-set identity header asserts a claim the client is
+  // not allowed to make — harmless only for as long as it is ignored — so it
+  // is gone rather than left as a misleading no-op.
   client = axios.create({
     baseURL: normalizeBaseUrl(baseUrl),
     timeout: 10_000,
@@ -49,7 +55,6 @@ export async function getClient(): Promise<AxiosInstance> {
       Accept: "application/json",
       "Content-Type": "application/json",
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      "X-Fennoc-User": userId || "vince",
     },
   });
 
@@ -201,18 +206,21 @@ export async function setBudgetLimit(limit: number): Promise<Budget> {
   return request<Budget>("PATCH", "/api/budget", { limit });
 }
 
-// `user` is sent explicitly in the body, even though getClient() also sets
-// an `X-Fennoc-User` header on every request. That header looks like it
-// should be enough, but the server does not read it — anywhere. The
-// endpoint resolves the owner as `body.user or "vince"`, so omitting it
-// here would silently file every device token under "vince" regardless of
-// who the client says it is.
+// `user` is sent explicitly in the body because this endpoint resolves the
+// owner as `body.user or "vince"`. Omitting it would silently file every
+// device token under "vince" regardless of whose handset it is.
 //
 // That is invisible while there is one user and it is Vince, and wrong the
 // moment there isn't. A device token is the one row that says "notify THIS
 // person on THIS handset"; misattributing it means pushing someone else's
 // content to a stranger's phone. Cheap to get right now, expensive to
 // discover later.
+//
+// This body field is now the ONLY place the client names a user: the
+// `X-Fennoc-User` header this comment used to contrast against is gone (see
+// `getClient`). It should itself go when INT-058 inc. 2 lands and the
+// bearer token alone selects the tenant — at which point a client-supplied
+// `user` becomes the same unauthorized claim the header was.
 export async function registerPushToken(
   token: string,
   platform: string,
