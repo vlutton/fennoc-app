@@ -11,6 +11,9 @@
       "bundleIdentifier": "com.fennoc.app",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
