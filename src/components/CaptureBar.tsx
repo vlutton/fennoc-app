@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
+  Linking,
   Pressable,
   Text,
   TextInput,
@@ -453,12 +454,31 @@ export function CaptureBar() {
     }
 
     const existing = await ExpoSpeechRecognitionModule.getPermissionsAsync();
-    const granted =
-      existing.granted ||
-      (await ExpoSpeechRecognitionModule.requestPermissionsAsync()).granted;
-    if (!granted) {
-      showFeedback("error", "Microphone access is off.");
-      return;
+    if (!existing.granted) {
+      // Android treats a dismissed dialog as a denial and stops re-asking
+      // after very few of those — at which point requestPermissionsAsync
+      // resolves denied instantly and "Microphone access is off" was a
+      // dead end the user could not act on from here. The tap's intent is
+      // unambiguous (they pressed the mic wanting voice), so when the OS
+      // will no longer ask, take them to the one switch that fixes it
+      // instead of stating a fact. openSettings over a message: the same
+      // reasoning as "ambiguity becomes a question" — a dead end becomes
+      // a door.
+      if (!existing.canAskAgain) {
+        showFeedback("error", "Microphone access is off — opening settings.");
+        await Linking.openSettings();
+        return;
+      }
+      const requested = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!requested.granted) {
+        showFeedback(
+          "error",
+          requested.canAskAgain
+            ? "Microphone access is off."
+            : "Microphone access is off — enable it in system settings for Fennoc.",
+        );
+        return;
+      }
     }
 
     // Ruling 1b: on-device platform STT, not the cloud-backed mode these
