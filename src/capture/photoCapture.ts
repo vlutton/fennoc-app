@@ -2,9 +2,10 @@
  * Camera/gallery → upload orchestration for the photo-capture hot path
  * (Step 11 of the design handoff — "a photo is a sentence you didn't have
  * to say"). Two callers share this: CameraCapture.tsx (the hot path — one
- * tap on the composer's camera key, no chrome, shutter-is-send) and
- * CaptureBar's long-press library flow (the cold path — a picker, and the
- * one place a caption survives, per Step 15).
+ * tap on the composer's camera key, no chrome, shutter-is-send, and — per
+ * INT-035 ruling 13 — an optional caption riding along with it) and
+ * CaptureBar's long-press library flow (the cold path — a picker with its
+ * own caption, per Step 15).
  *
  * Deliberately framework-free: no React import, no `expo-camera` import.
  * Everything that talks to native APIs here (`expo-file-system`, the
@@ -106,11 +107,14 @@ export interface CaptureShotOptions {
    *  standalone gallery pick, which never batches with anything). Decides
    *  whether this shot starts a new thread entry or joins an existing one. */
   isFirstInBatch: boolean;
-  /** Set only by the gallery/library flow (CaptureBar's long-press path) —
-   *  the camera hot path never passes this. See Step 15: "No caption
-   *  field... The next thing you say is the caption" for the camera path;
-   *  a gallery pick is the one exception, because "choosing an old photo
-   *  means the moment is gone." */
+  /** Set by either caller now. Originally gallery/library-only (Step 15:
+   *  "No caption field... The next thing you say is the caption" for the
+   *  camera path) — INT-035 ruling 13 (2026-08-02) reverses that for the
+   *  camera hot path too: CameraCapture.tsx's optional caption field passes
+   *  whatever's typed (or `undefined` if empty) through this same field, so
+   *  the two capture origins share one mechanism for "the shot's caption"
+   *  even though the UI offering it differs (a persistent field on the
+   *  camera sheet vs. the composer text at send time for a gallery pick). */
   question?: string;
 }
 

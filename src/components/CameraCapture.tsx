@@ -3,7 +3,7 @@ import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import { Images, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Pressable, Text, TextInput, View } from "react-native";
 import {
   initialWindowMetrics,
   SafeAreaProvider,
@@ -62,11 +62,21 @@ function mimeForFormat(format: "jpg" | "png"): string {
  * reset on every open, not just the first mount, because this component
  * stays mounted (with `visible` toggling) rather than being torn down and
  * rebuilt by CaptureBar — see its own render of this component.
+ *
+ * INT-035 ruling 13 (2026-08-02) reverses ruling 2: an optional single-line
+ * caption now lives on this sheet, above the shutter. It shares the same
+ * reset-on-open lifetime as `batchIdRef`/`shotCountRef` above — one note
+ * per camera session, covering every shot in that session's batch, cleared
+ * the next time the camera opens — rather than its own independent state
+ * machine. Ruling 1 (shutter is send) is untouched: the field never gates
+ * or delays the shutter, which sends with whatever the field holds (often
+ * nothing) the instant it's pressed.
  */
 export function CameraCapture({ visible, onClose, onChooseFromLibrary }: CameraCaptureProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [caption, setCaption] = useState("");
   const cameraRef = useRef<CameraView>(null);
   const batchIdRef = useRef<string>(Crypto.randomUUID());
   const shotCountRef = useRef(0);
@@ -80,6 +90,7 @@ export function CameraCapture({ visible, onClose, onChooseFromLibrary }: CameraC
     // camera key.
     batchIdRef.current = Crypto.randomUUID();
     shotCountRef.current = 0;
+    setCaption("");
     setCameraReady(false);
     if (permission && !permission.granted && permission.canAskAgain) {
       void requestPermission();
@@ -115,7 +126,14 @@ export function CameraCapture({ visible, onClose, onChooseFromLibrary }: CameraC
         // open for another shot does not wait on it.
         void captureShot(
           { uri: picture.uri, mime: mimeForFormat(picture.format) },
-          { batchId: batchIdRef.current, isFirstInBatch },
+          {
+            batchId: batchIdRef.current,
+            isFirstInBatch,
+            // Ruling 13 (INT-035): optional and never a gate — an empty
+            // field sends `undefined`, identical to today's payload, so
+            // the quick shutter-is-send path is byte-for-byte unchanged.
+            question: caption.trim() || undefined,
+          },
         );
       })
       .catch((error: unknown) => {
@@ -216,20 +234,52 @@ export function CameraCapture({ visible, onClose, onChooseFromLibrary }: CameraC
 
             <View className="flex-1" />
 
-            <View className="mb-8 items-center">
-              <Pressable
-                accessibilityLabel="Shutter"
-                accessibilityRole="button"
-                className="h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white active:opacity-70"
-                disabled={!cameraReady}
-                onPress={onShutterPress}
-              >
-                <View
-                  className="h-[60px] w-[60px] rounded-full bg-white"
-                  style={{ opacity: cameraReady ? 1 : 0.4 }}
+            {/* Ruling 13 (INT-035): an optional caption, above the shutter.
+                Wrapped in its own `KeyboardAvoidingView` (same "padding" /
+                `keyboardVerticalOffset={0}` combination ThreadScreen uses
+                around the composer, for the identical reason — Android's
+                edge-to-edge default silently defeats the manifest's
+                `adjustResize` and the field would otherwise draw under the
+                keyboard) so a focused field lifts clear of the keyboard.
+                The shutter riding up with it is fine — it's still reachable
+                — but nothing here forces that; the field is free to sit
+                right above the keyboard even if that means the shutter
+                itself ends up covered while typing, since typing is not
+                shooting. */}
+            <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0}>
+              <View className="mb-4 px-8">
+                <TextInput
+                  accessibilityLabel="Caption"
+                  autoCapitalize="sentences"
+                  autoCorrect
+                  // Deliberately NOT `autoFocus`: the viewfinder is the
+                  // first thing this sheet shows, and shooting without ever
+                  // touching this field has to stay the frictionless
+                  // default (ruling 1, still untouched by ruling 13).
+                  className="h-touch rounded-full bg-black/40 px-4 font-sans text-body text-white"
+                  onChangeText={setCaption}
+                  placeholder="Add a note…"
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  returnKeyType="done"
+                  value={caption}
                 />
-              </Pressable>
-            </View>
+              </View>
+
+              <View className="mb-8 items-center">
+                <Pressable
+                  accessibilityLabel="Shutter"
+                  accessibilityRole="button"
+                  className="h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white active:opacity-70"
+                  disabled={!cameraReady}
+                  onPress={onShutterPress}
+                >
+                  <View
+                    className="h-[60px] w-[60px] rounded-full bg-white"
+                    style={{ opacity: cameraReady ? 1 : 0.4 }}
+                  />
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
           </SafeAreaView>
         </View>
       </SafeAreaProvider>
