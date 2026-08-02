@@ -791,9 +791,22 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
   // exactly like a new message would — without this guard, that expansion
   // would fight the source-scroll effect below for control of the scroll
   // position on the very same content-size change.
+  // Whether the first bottom-anchor has happened. Before INT-057 the thread
+  // was today-only and short, so an animated scrollToEnd was always a small,
+  // reliable hop. Now the full multi-day history renders above today: on open
+  // the short local overlay paints first (anchor to its bottom, fine), then
+  // GET /api/thread lands and content grows by thousands of px in one change.
+  // An ANIMATED scrollToEnd across that distance — while each day boundary is
+  // still firing its onLayout and heights are settling — lands short and
+  // leaves the user near the top (the reported bug). So the initial anchor is
+  // INSTANT: jump straight to the true bottom, no animation to be interrupted
+  // mid-layout. Once the user has taken the scroll themselves (first drag),
+  // subsequent live changes (their message, the reply landing below the fold)
+  // animate as before — that earlier below-the-fold fix is preserved.
+  const initialAnchorDone = useRef(false);
   const onThreadContentSizeChange = () => {
     if (pendingScrollDate) return;
-    scrollRef.current?.scrollToEnd({ animated: true });
+    scrollRef.current?.scrollToEnd({ animated: initialAnchorDone.current });
   };
 
   // Shared by both Reply entry points (the inline CTA on an agent reply in
@@ -1074,6 +1087,13 @@ export function ThreadScreen({ onOpenSettings }: ThreadScreenProps) {
         className="flex-1"
         contentContainerClassName="flex-grow justify-end gap-[18px] px-4 py-5"
         onContentSizeChange={onThreadContentSizeChange}
+        // The user grabbing the scroll is the signal that the initial
+        // instant-anchor is over: from here their own sends animate to the
+        // bottom rather than snapping. A source-tap jump (pendingScrollDate)
+        // is programmatic, not a drag, so it never trips this.
+        onScrollBeginDrag={() => {
+          initialAnchorDone.current = true;
+        }}
         ref={scrollRef}
       >
         {days.map((day, dayIndex) => {
